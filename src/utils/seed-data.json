@@ -1,0 +1,42 @@
+[
+  {
+    "roll_number": "16SAM022",
+    "name": "Kishore Kumar R",
+    "department": "Computer Science",
+    "lead_talks_delivered": 4,
+    "rubiks_cube_events": 2,
+    "outreach_visits_pups_manivakkam": 3,
+    "mask_off_attendance": 5,
+    "wellness_score": 88
+  },
+  {
+    "roll_number": "16SAM025",
+    "name": "Priyanka S",
+    "department": "Information Technology",
+    "lead_talks_delivered": 2,
+    "rubiks_cube_events": 5,
+    "outreach_visits_pups_manivakkam": 4,
+    "mask_off_attendance": 4,
+    "wellness_score": 92
+  },
+  {
+    "roll_number": "16SAM048",
+    "name": "Aditya Vardhan",
+    "department": "Electronics & Communication",
+    "lead_talks_delivered": 5,
+    "rubiks_cube_events": 1,
+    "outreach_visits_pups_manivakkam": 2,
+    "mask_off_attendance": 3,
+    "wellness_score": 75
+  },
+  {
+    "roll_number": "16SAM099",
+    "name": "Siddharth Sen",
+    "department": "Mechanical Engineering",
+    "lead_talks_delivered": 0,
+    "rubiks_cube_events": 3,
+    "outreach_visits_pups_manivakkam": 5,
+    "mask_off_attendance": 6,
+    "wellness_score": 80
+  }
+]

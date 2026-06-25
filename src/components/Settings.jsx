@@ -1,0 +1,170 @@
+import React, { useState, useEffect } from 'react';
+import { getLLMConfig, saveLLMConfig, queryLLM } from '../utils/llm';
+import { ShieldCheck, ShieldAlert, Cpu, Play, RefreshCw, Key, HelpCircle } from 'lucide-react';
+
+export default function Settings() {
+  const [config, setConfig] = useState({
+    apiKey: '',
+    enabled: false
+  });
+
+  const [testStatus, setTestStatus] = useState('idle'); // idle, testing, success, error
+  const [testResult, setTestResult] = useState('');
+  const [showKey, setShowKey] = useState(false);
+
+  // Load config on mount
+  useEffect(() => {
+    const loaded = getLLMConfig();
+    setConfig({
+      apiKey: loaded.apiKey,
+      enabled: loaded.enabled
+    });
+  }, []);
+
+  const handleChange = (field, value) => {
+    const updated = { ...config, [field]: value };
+    setConfig(updated);
+    saveLLMConfig(updated);
+  };
+
+  const handleTestConnection = async () => {
+    setTestStatus('testing');
+    setTestResult('');
+
+    // Sample mock student data for testing the prompt context assembly
+    const mockStudents = [
+      { roll_number: '16SAM000', name: 'Test Student', department: 'Computer Science', lead_talks_delivered: 1, rubiks_cube_events: 1, outreach_visits_pups_manivakkam: 1, mask_off_attendance: 1, wellness_score: 90 }
+    ];
+    const mockOutreach = [];
+
+    try {
+      // Test message
+      const response = await queryLLM(
+        'Diagnose system connectivity. Respond with "Connection successful, Guru!" if you can see this message.', 
+        mockStudents, 
+        mockOutreach
+      );
+      setTestStatus('success');
+      setTestResult(response);
+    } catch (err) {
+      setTestStatus('error');
+      setTestResult(err.message || 'Unknown connection error occurred.');
+    }
+  };
+
+  return (
+    <div className="tab-content">
+      <div className="glass-card" style={{ marginBottom: '24px' }}>
+        <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Cpu style={{ color: 'var(--color-primary)' }} />
+          Gemini AI Integration Settings
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '20px' }}>
+          Guru garu, configure your Gemini API key below. This connects Shishya to Google's reasoning engines to run advanced student analytics reports and natural language chat interfaces.
+        </p>
+
+        {/* Enabled Checkbox Switch */}
+        <div className="form-group" style={{ marginBottom: '24px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <input 
+              type="checkbox" 
+              checked={config.enabled}
+              onChange={(e) => handleChange('enabled', e.target.checked)}
+              style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }}
+            />
+            <span style={{ fontWeight: '600', fontSize: '15px' }}>Enable Gemini AI Capabilities</span>
+          </label>
+        </div>
+
+        {config.enabled && (
+          <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: '1fr', gap: '20px', animation: 'fadeIn 0.3s ease' }}>
+            
+            {/* API Key */}
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Gemini API Key</span>
+                <span 
+                  style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px' }}
+                  onClick={() => setShowKey(!showKey)}
+                >
+                  {showKey ? 'Hide Key' : 'Reveal Key'}
+                </span>
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input 
+                  type={showKey ? 'text' : 'password'} 
+                  className="form-control" 
+                  placeholder="AIzaSy..."
+                  value={config.apiKey}
+                  onChange={(e) => handleChange('apiKey', e.target.value)}
+                  style={{ paddingRight: '40px' }}
+                />
+                <Key size={16} style={{ position: 'absolute', right: '12px', top: '12px', color: 'var(--text-muted)' }} />
+              </div>
+            </div>
+
+            {/* Integration Tips */}
+            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '13px' }}>
+              <strong style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-warning)', marginBottom: '8px' }}>
+                <HelpCircle size={14} /> Integration Instructions
+              </strong>
+              <ul style={{ marginLeft: '16px', listStyleType: 'disc', color: 'var(--text-secondary)' }}>
+                <li>Get a Gemini API Key from Google AI Studio.</li>
+                <li>API calls are performed client-side safely from your browser.</li>
+              </ul>
+            </div>
+
+            {/* Test Connection Panel */}
+            <div style={{ marginTop: '12px', padding: '16px', background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ fontWeight: '600' }}>Handshake Diagnostics</span>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={handleTestConnection}
+                  disabled={testStatus === 'testing'}
+                  style={{ padding: '6px 14px', fontSize: '13px' }}
+                >
+                  {testStatus === 'testing' ? (
+                    <>
+                      <RefreshCw size={14} className="spin" /> Testing...
+                    </>
+                  ) : (
+                    <>
+                      <Play size={14} /> Run Handshake Test
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {testStatus === 'success' && (
+                <div style={{ display: 'flex', gap: '8px', color: 'var(--color-success)', background: 'rgba(16,185,129,0.08)', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                  <ShieldCheck size={18} style={{ flexShrink: 0 }} />
+                  <div>
+                    <strong>Connection successful:</strong> {testResult}
+                  </div>
+                </div>
+              )}
+
+              {testStatus === 'error' && (
+                <div style={{ display: 'flex', gap: '8px', color: 'var(--color-error)', background: 'rgba(239,68,68,0.08)', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  <ShieldAlert size={18} style={{ flexShrink: 0 }} />
+                  <div>
+                    <strong>Handshake failed:</strong>
+                    <div style={{ marginTop: '4px', fontFamily: 'monospace', fontSize: '12px' }}>{testResult}</div>
+                  </div>
+                </div>
+              )}
+
+              {testStatus === 'idle' && (
+                <div style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic' }}>
+                  Ready to test connection with Gemini API.
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
