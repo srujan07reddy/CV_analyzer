@@ -7,7 +7,7 @@ export default function OutreachTracker({ outreachList, onSaveOutreach, onDelete
 
   // Form state
   const [targetLocation, setTargetLocation] = useState('PUPS Manivakkam');
-  const [classification, setClassification] = useState('Maths Club Rubik\'s Training');
+  const [classification, setClassification] = useState('');
   const [facilitators, setFacilitators] = useState('');
   const [volume, setVolume] = useState(1);
 
@@ -20,8 +20,7 @@ export default function OutreachTracker({ outreachList, onSaveOutreach, onDelete
       return;
     }
 
-    // Validate facilitator roll list (e.g. 16SAM022, 16SAM025)
-    const rollRegex = /^\d{2}[A-Z]{3}\d{3}$/;
+    // Validate facilitator roll list (accept any non-empty keys)
     const rollArray = facilitators.split(',')
       .map(r => r.trim().toUpperCase())
       .filter(r => r.length > 0);
@@ -29,13 +28,6 @@ export default function OutreachTracker({ outreachList, onSaveOutreach, onDelete
     if (rollArray.length === 0) {
       setErrorMsg('Guru garu, please list at least one facilitator roll number.');
       return;
-    }
-
-    for (const roll of rollArray) {
-      if (!rollRegex.test(roll)) {
-        setErrorMsg(`Guru garu, roll number '${roll}' does not match the authorized template (e.g. 16SAM022).`);
-        return;
-      }
     }
 
     const newOutreach = {
@@ -78,12 +70,7 @@ export default function OutreachTracker({ outreachList, onSaveOutreach, onDelete
             </div>
             <div className="form-group">
               <label className="form-label">Program Classification</label>
-              <select className="form-control" value={classification} onChange={(e) => setClassification(e.target.value)}>
-                <option value="Maths Club Rubik's Training">Maths Club Rubik's Training</option>
-                <option value="Lead Talks Outreach">Lead Talks Outreach</option>
-                <option value="MASK OFF Wellness Outreach">MASK OFF Wellness Outreach</option>
-                <option value="General Science Awareness">General Science Awareness</option>
-              </select>
+              <input type="text" className="form-control" placeholder="e.g. Rubik's Cube Training, Lead Talks Outreach" value={classification} onChange={(e) => setClassification(e.target.value)} required />
             </div>
             <div className="form-group">
               <label className="form-label">Facilitator Roll Numbers (comma separated)</label>

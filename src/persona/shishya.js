@@ -19,7 +19,7 @@ export function processShishyaQuery(rawQuery, currentStudents = []) {
   const authorizedNames = new Set(studentsList.map(s => s.name.toLowerCase()));
   const authorizedDepts = new Set(['computer science', 'information technology', 'electronics & communication', 'mechanical engineering']);
   const authorizedLocations = new Set(['pups manivakkam', 'manivakkam']);
-  const authorizedEvents = new Set(['rubik\'s cube', 'rubiks cube', 'maths club', 'mask off', 'wellness', 'lead talks']);
+  const authorizedEvents = new Set(['rubik\'s cube', 'rubiks cube', 'maths club', 'mask off', 'lead talks']);
 
   // Pre-check for unauthorized external names or terms to satisfy Constraint #1 and #2
   // We scan the query for name-like nouns or terms not present in our authorized vocabulary
@@ -38,18 +38,33 @@ export function processShishyaQuery(rawQuery, currentStudents = []) {
     return `Guru garu, it is my humble honor to assist you. ${message} Your devoted Shishya is ever ready to serve you.`;
   };
 
+  const standardKeys = new Set([
+    'roll_number',
+    'name',
+    'department',
+    'lead_talks_delivered',
+    'rubiks_cube_events',
+    'outreach_visits_pups_manivakkam',
+    'mask_off_attendance'
+  ]);
+
   // Route 1: Show/List all students
   if (query.includes('list') || query.includes('show all') || query.includes('students')) {
-    if (query.includes('score') || query.includes('leadership')) {
-      // Return student leadership scores
-      const scoreRows = studentsList.map(s => `• ${s.name} (${s.roll_number}): ${s.leadership_score || 'N/A'}`).join('\n');
-      return {
-        response: formatResponse(`I have compiled the current Leadership Scores from our SDC manifests:\n\n${scoreRows}`),
-        data: studentsList
-      };
-    }
 
-    const rosterRows = studentsList.map(s => `• ${s.name} (${s.roll_number}) - Dept: ${s.department}`).join('\n');
+
+    const rosterRows = studentsList.map(s => {
+      let base = `• ${s.name} (${s.roll_number}) - Dept: ${s.department}`;
+      const customParts = [];
+      Object.keys(s).forEach(key => {
+        if (!standardKeys.has(key)) {
+          customParts.push(`${key.replace(/_/g, ' ')}: ${s[key]}`);
+        }
+      });
+      if (customParts.length > 0) {
+        base += ` [${customParts.join(', ')}]`;
+      }
+      return base;
+    }).join('\n');
     return {
       response: formatResponse(`Here is the active student roster recorded in the local registry:\n\n${rosterRows}`),
       data: studentsList
@@ -85,13 +100,19 @@ export function processShishyaQuery(rawQuery, currentStudents = []) {
       `Lead Talks: ${foundStudent.lead_talks_delivered}`,
       `Rubik's Cube Events: ${foundStudent.rubiks_cube_events}`,
       `Outreach Visits (PUPS Manivakkam): ${foundStudent.outreach_visits_pups_manivakkam}`,
-      `MASK OFF Wellness Attendance: ${foundStudent.mask_off_attendance}`,
-      `Wellness Base Score: ${foundStudent.wellness_score}%`,
-      `Computed Leadership Score: ${foundStudent.leadership_score || 'Pending'}`
-    ].join('\n  ');
+      `MASK OFF Attendance: ${foundStudent.mask_off_attendance}`
+    ];
+
+    Object.keys(foundStudent).forEach(key => {
+      if (!standardKeys.has(key)) {
+        details.push(`${key.replace(/_/g, ' ')}: ${foundStudent[key]}`);
+      }
+    });
+
+    const detailsStr = details.join('\n  ');
 
     return {
-      response: formatResponse(`I have retrieved the authentic record for student ${foundStudent.name} from the local database:\n\n  ${details}`),
+      response: formatResponse(`I have retrieved the authentic record for student ${foundStudent.name} from the local database:\n\n  ${detailsStr}`),
       data: foundStudent
     };
   }
@@ -105,19 +126,19 @@ export function processShishyaQuery(rawQuery, currentStudents = []) {
     };
   }
 
-  // Route 4: Event info lookup (e.g. Maths Club Rubik's Cube, MASK OFF)
-  if (query.includes('rubik') || query.includes('cube') || query.includes('math')) {
+  // Route 4: Event info lookup (e.g. Rubik's Cube, MASK OFF)
+  if (query.includes('rubik') || query.includes('cube')) {
     const totalEvents = studentsList.reduce((sum, s) => sum + (s.rubiks_cube_events || 0), 0);
     return {
-      response: formatResponse(`Regarding the Maths Club Rubik's Cube event: facilitators have conducted/supported a combined total of ${totalEvents} sessions.`),
-      data: { event: 'Maths Club Rubik\'s Cube', count: totalEvents }
+      response: formatResponse(`Regarding the Rubik's Cube sessions: facilitators have conducted/supported a combined total of ${totalEvents} sessions.`),
+      data: { event: 'Rubik\'s Cube', count: totalEvents }
     };
   }
 
-  if (query.includes('mask off') || query.includes('wellness') || query.includes('seminar')) {
+  if (query.includes('mask off')) {
     const totalWellnessAttendance = studentsList.reduce((sum, s) => sum + (s.mask_off_attendance || 0), 0);
     return {
-      response: formatResponse(`Regarding the "MASK OFF" wellness seminars: our records indicate a total attendance volume of ${totalWellnessAttendance} student-sessions.`),
+      response: formatResponse(`Regarding the "MASK OFF" sessions: our records indicate a total attendance volume of ${totalWellnessAttendance} student-sessions.`),
       data: { seminar: 'MASK OFF', totalWellnessAttendance }
     };
   }

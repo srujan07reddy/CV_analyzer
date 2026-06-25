@@ -484,3 +484,29 @@ h1, h2, h3, h4 {
   background: rgba(139, 92, 246, 0.08) !important;
   box-shadow: 0 0 16px rgba(139, 92, 246, 0.2);
 }
+
+/* Department Dashboard styling */
+.dept-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dept-card:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 8px 24px rgba(6, 182, 212, 0.1);
+}
+
+/* Table Row Hover styling */
+.table-row-hover:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Floating Chat widget styling */
+.floating-chat-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.floating-chat-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 24px rgba(6, 182, 212, 0.6);
+}
+

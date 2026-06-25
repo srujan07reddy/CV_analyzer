@@ -33,7 +33,7 @@ export default function Settings() {
 
     // Sample mock student data for testing the prompt context assembly
     const mockStudents = [
-      { roll_number: '16SAM000', name: 'Test Student', department: 'Computer Science', lead_talks_delivered: 1, rubiks_cube_events: 1, outreach_visits_pups_manivakkam: 1, mask_off_attendance: 1, wellness_score: 90 }
+      { roll_number: 'xxJUyyyzzz', name: 'x', department: 'y', lead_talks_delivered: 1, rubiks_cube_events: 1, outreach_visits_pups_manivakkam: 1, mask_off_attendance: 1 }
     ];
     const mockOutreach = [];
 

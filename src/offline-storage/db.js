@@ -1,6 +1,6 @@
 // SDC Analytics Platform - Local IndexedDB Manager
 const DB_NAME = 'SDC_Analytics_DB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export function initDB() {
   return new Promise((resolve, reject) => {
@@ -37,6 +37,12 @@ export function initDB() {
       if (!db.objectStoreNames.contains('sync_queue')) {
         db.createObjectStore('sync_queue', { keyPath: 'id', autoIncrement: true });
         console.log('[DB] Created object store: sync_queue');
+      }
+
+      // Store 4: Groups Management
+      if (!db.objectStoreNames.contains('groups')) {
+        db.createObjectStore('groups', { keyPath: 'id', autoIncrement: true });
+        console.log('[DB] Created object store: groups');
       }
     };
   });
@@ -81,6 +87,14 @@ export function deleteStudent(roll_number) {
   return runTransaction('students', 'readwrite', (store) => store.delete(roll_number));
 }
 
+export function getStudent(roll_number) {
+  return runTransaction('students', 'readonly', (store) => store.get(roll_number));
+}
+
+export function clearAllStudents() {
+  return runTransaction('students', 'readwrite', (store) => store.clear());
+}
+
 // Outreach CRUD
 export function getAllOutreach() {
   return runTransaction('outreach', 'readonly', (store) => store.getAll());
@@ -92,6 +106,27 @@ export function saveOutreach(outreach) {
 
 export function deleteOutreach(id) {
   return runTransaction('outreach', 'readwrite', (store) => store.delete(id));
+}
+
+export function clearAllOutreach() {
+  return runTransaction('outreach', 'readwrite', (store) => store.clear());
+}
+
+// Groups CRUD
+export function getAllGroups() {
+  return runTransaction('groups', 'readonly', (store) => store.getAll());
+}
+
+export function saveGroup(group) {
+  return runTransaction('groups', 'readwrite', (store) => store.put(group));
+}
+
+export function deleteGroup(id) {
+  return runTransaction('groups', 'readwrite', (store) => store.delete(id));
+}
+
+export function clearAllGroups() {
+  return runTransaction('groups', 'readwrite', (store) => store.clear());
 }
 
 // Sync Queue Helpers

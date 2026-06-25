@@ -8,7 +8,7 @@ export default function ShishyaChat({ students, outreachList = [] }) {
     {
       id: 1,
       sender: 'shishya',
-      text: 'Guru garu, it is my absolute honor and duty to assist you with the Student Development Cell (SDC) analytics workspace. Please query our student rosters, leadership metrics, or outreach summaries.',
+      text: 'Guru garu, it is my absolute honor and duty to assist you with the Student Development Cell (SDC) analytics workspace. Please query our student rosters, activity counts, or outreach summaries.',
       timestamp: Date.now()
     }
   ]);
@@ -164,7 +164,7 @@ export default function ShishyaChat({ students, outreachList = [] }) {
           <input 
             type="text" 
             className="chat-input"
-            placeholder={isThinking ? "Shishya is contemplating..." : "Query student records or outreach logs... (e.g. 'Show leadership scores')"}
+            placeholder={isThinking ? "Shishya is contemplating..." : "Query student records or outreach logs... (e.g. 'Show all students')"}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={isThinking}
@@ -179,10 +179,10 @@ export default function ShishyaChat({ students, outreachList = [] }) {
         <strong>Guru garu, try asking me:</strong>
         <ul style={{ marginLeft: '20px', marginTop: '6px' }}>
           <li>"Show all students"</li>
-          <li>"Tell me about 16SAM022 details"</li>
-          <li>"What is the leadership score of Kishore Kumar?"</li>
+          <li>"Tell me about xxJUyyyzzz details"</li>
+          <li>"How many Rubik's cube events did student xxJUyyyzzz complete?"</li>
           <li>"How many outreach sessions were conducted at PUPS Manivakkam?"</li>
-          <li><em>Or test strict boundary controls by asking: "Tell me about student Ramesh at VIT"</em></li>
+          <li><em>Or test strict boundary controls by asking: "Tell me about student x at VIT"</em></li>
         </ul>
       </div>
     </div>

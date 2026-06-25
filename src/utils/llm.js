@@ -42,8 +42,28 @@ export function saveLLMConfig(config) {
  * Builds the context payload to inject into the LLM system instructions
  */
 export function buildDataContextPrompt(studentsList = [], outreachList = []) {
+  const standardKeys = new Set([
+    'roll_number',
+    'name',
+    'department',
+    'lead_talks_delivered',
+    'rubiks_cube_events',
+    'outreach_visits_pups_manivakkam',
+    'mask_off_attendance'
+  ]);
+
   const studentsStr = studentsList.map(s => {
-    return `- Roll: ${s.roll_number}, Name: ${s.name}, Dept: ${s.department}, Lead Talks: ${s.lead_talks_delivered}, Rubik's Events: ${s.rubiks_cube_events}, Outreach Visits: ${s.outreach_visits_pups_manivakkam}, MASK OFF Attendance: ${s.mask_off_attendance}, Wellness Base Score: ${s.wellness_score}%`;
+    let base = `- Roll: ${s.roll_number}, Name: ${s.name}, Dept: ${s.department}, Lead Talks: ${s.lead_talks_delivered}, Rubik's Events: ${s.rubiks_cube_events}, Outreach Visits: ${s.outreach_visits_pups_manivakkam}, MASK OFF Attendance: ${s.mask_off_attendance}`;
+    const customParts = [];
+    Object.keys(s).forEach(key => {
+      if (!standardKeys.has(key)) {
+        customParts.push(`${key.replace(/_/g, ' ')}: ${s[key]}`);
+      }
+    });
+    if (customParts.length > 0) {
+      base += `, Custom Details: [${customParts.join(', ')}]`;
+    }
+    return base;
   }).join('\n');
 
   const outreachStr = outreachList.map(o => {

@@ -23,6 +23,40 @@ const DEPT_MAPPING = {
   'mechanical engineering': 'Mechanical Engineering'
 };
 
+export function getDeptFromRoll(roll) {
+  if (!roll) return null;
+  const match = roll.toString().trim().toUpperCase().match(/^\d{2}JU([A-Z]+)\d{3}$/);
+  if (!match) return null;
+  
+  const deptCode = match[1];
+  switch (deptCode) {
+    case 'AI':
+      return 'AIML';
+    case 'DS':
+    case 'AIDS':
+      return 'AIDS';
+    case 'CYS':
+      return 'cybersecurity';
+    case 'CS':
+      return 'General CSE';
+    case 'EC':
+      return 'ECE';
+    default:
+      return null;
+  }
+}
+
+export function getYearFromRoll(roll) {
+  if (!roll) return 'Unknown';
+  const cleanRoll = roll.toString().trim().toUpperCase();
+  const match = cleanRoll.match(/^(\d{2})/);
+  if (match) {
+    return '20' + match[1];
+  }
+  return 'Unknown';
+}
+
+
 const HEADER_MAPPING = {
   'rollnumber': 'roll_number',
   'roll_number': 'roll_number',
@@ -50,10 +84,7 @@ const HEADER_MAPPING = {
   'maskoff': 'mask_off_attendance',
   'mask_off': 'mask_off_attendance',
   'maskoffattendance': 'mask_off_attendance',
-  'mask_off_attendance': 'mask_off_attendance',
-  'wellness': 'wellness_score',
-  'wellnessscore': 'wellness_score',
-  'wellness_score': 'wellness_score'
+  'mask_off_attendance': 'mask_off_attendance'
 };
 
 function parseCSVLine(line) {
@@ -83,18 +114,39 @@ export function parseAndValidateCSV(csvText) {
   }
 
   const rawHeaders = parseCSVLine(lines[0]);
-  const headers = rawHeaders.map(h => {
+  
+  // Try to match core structural columns, keeping all other headings exactly as they are in the CSV
+  let headers = rawHeaders.map(h => {
     const clean = h.toLowerCase().replace(/[^a-z0-9_]/g, '');
-    return HEADER_MAPPING[clean] || clean;
+    if (clean.includes('roll') || clean.includes('reg') || clean.includes('id') || clean.includes('num')) {
+      return 'roll_number';
+    }
+    if (clean.includes('name') || clean.includes('stud') || clean.includes('full')) {
+      return 'name';
+    }
+    if (clean.includes('dept') || clean.includes('bran') || clean.includes('special')) {
+      return 'department';
+    }
+    return h.trim(); // Keep original header name exactly
   });
 
-  // Verify necessary headers: roll_number and name are required
   if (!headers.includes('roll_number') || !headers.includes('name')) {
-    return {
-      success: false,
-      errors: ['Invalid headers. Missing required fields: Roll Number (roll_number) or Name (name). Available columns: ' + rawHeaders.join(', ')],
-      validRecords: []
-    };
+    // Positional fallback for at least roll_number (index 0) and name (index 1) if we have at least 2 columns
+    if (rawHeaders.length >= 2) {
+      console.log('[Importer] Falling back to positional mapping for Roll Number (Col 1) and Name (Col 2).');
+      headers = rawHeaders.map((h, idx) => {
+        if (idx === 0) return 'roll_number';
+        if (idx === 1) return 'name';
+        if (idx === 2) return 'department';
+        return h.trim();
+      });
+    } else {
+      return {
+        success: false,
+        errors: ['Invalid headers. Headers must contain keywords for Roll Number and Name, or have at least 2 columns for positional mapping. Available columns: ' + rawHeaders.join(', ')],
+        validRecords: []
+      };
+    }
   }
 
   const validRecords = [];
@@ -141,13 +193,33 @@ export function parseAndValidateJSON(jsonText) {
 
   records.forEach((record, index) => {
     const indexNum = index + 1;
-    // Map headers keys just in case
     const normalizedRecord = {};
+    
     Object.keys(record).forEach(key => {
       const clean = key.toLowerCase().replace(/[^a-z0-9_]/g, '');
-      const mappedKey = HEADER_MAPPING[clean] || key;
+      let mappedKey;
+      
+      if (clean.includes('roll') || clean.includes('reg') || clean.includes('id') || clean.includes('num')) {
+        mappedKey = 'roll_number';
+      } else if (clean.includes('name') || clean.includes('stud') || clean.includes('full')) {
+        mappedKey = 'name';
+      } else if (clean.includes('dept') || clean.includes('bran') || clean.includes('special')) {
+        mappedKey = 'department';
+      } else {
+        mappedKey = key.trim();
+      }
+      
       normalizedRecord[mappedKey] = record[key];
     });
+
+    // Also support positional key mapping for JSON if keys are generic
+    if (!normalizedRecord.roll_number || !normalizedRecord.name) {
+      const keys = Object.keys(record);
+      if (keys.length >= 2) {
+        if (!normalizedRecord.roll_number) normalizedRecord.roll_number = record[keys[0]];
+        if (!normalizedRecord.name) normalizedRecord.name = record[keys[1]];
+      }
+    }
 
     const validation = validateStudentField(normalizedRecord, indexNum);
     if (validation.valid) {
@@ -167,12 +239,8 @@ export function parseAndValidateJSON(jsonText) {
 function validateStudentField(record, rowIdentifier) {
   // 1. Roll Number
   let roll = (record.roll_number || '').toString().trim().toUpperCase();
-  const rollRegex = /^\d{2}[A-Z]{3}\d{3}$/;
   if (!roll) {
     return { valid: false, message: 'Missing Roll Number' };
-  }
-  if (!rollRegex.test(roll)) {
-    return { valid: false, message: `Invalid Roll Number template '${roll}'. Must match SDC template: 2 digits, 3 letters, 3 digits (e.g. 16SAM022).` };
   }
 
   // 2. Name
@@ -183,8 +251,11 @@ function validateStudentField(record, rowIdentifier) {
 
   // 3. Department
   let rawDept = (record.department || '').toString().trim();
-  let dept = 'Computer Science'; // default
-  if (rawDept) {
+  let dept = '';
+  const derivedDept = getDeptFromRoll(roll);
+  if (derivedDept) {
+    dept = derivedDept;
+  } else if (rawDept) {
     const cleanDept = rawDept.toLowerCase().replace(/[^a-z0-9 &]/g, '');
     const mapped = DEPT_MAPPING[cleanDept];
     if (mapped) {
@@ -195,9 +266,19 @@ function validateStudentField(record, rowIdentifier) {
       if (found) {
         dept = found;
       } else {
-        return { valid: false, message: `Invalid department '${rawDept}'. Must be one of: ${VALID_DEPARTMENTS.join(', ')}` };
+        // Keep the custom department name to adapt to any data
+        dept = rawDept;
       }
     }
+  }
+
+  // Build validated record containing only the fields that were actually provided in the input record
+  const validatedRecord = {
+    roll_number: roll,
+    name
+  };
+  if (dept) {
+    validatedRecord.department = dept;
   }
 
   // 4. Activity stats & Wellness
@@ -207,30 +288,35 @@ function validateStudentField(record, rowIdentifier) {
     return isNaN(parsed) ? -1 : parsed;
   };
 
-  const leadTalks = parseNum(record.lead_talks_delivered, 0);
-  const rubiks = parseNum(record.rubiks_cube_events, 0);
-  const outreach = parseNum(record.outreach_visits_pups_manivakkam, 0);
-  const maskOff = parseNum(record.mask_off_attendance, 0);
-  const wellness = parseNum(record.wellness_score, 80);
+  let validationError = null;
 
-  if (leadTalks < 0) return { valid: false, message: 'Lead Talks must be a non-negative integer.' };
-  if (rubiks < 0) return { valid: false, message: "Rubik's Cube Events must be a non-negative integer." };
-  if (outreach < 0) return { valid: false, message: 'Outreach visits must be a non-negative integer.' };
-  if (maskOff < 0) return { valid: false, message: 'MASK OFF attendance must be a non-negative integer.' };
-  if (wellness < 0 || wellness > 100) return { valid: false, message: 'Wellness Score must be an integer between 0 and 100.' };
+  Object.keys(record).forEach(key => {
+    if (key === 'roll_number' || key === 'name' || key === 'department') return;
+
+    const value = record[key];
+
+    // If it's one of the standard numeric fields, validate it
+    if (key === 'lead_talks_delivered' || key === 'rubiks_cube_events' || 
+        key === 'outreach_visits_pups_manivakkam' || key === 'mask_off_attendance') {
+      const parsedVal = parseNum(value, 0);
+      if (parsedVal < 0) {
+        validationError = `${key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} must be a non-negative integer.`;
+      }
+      validatedRecord[key] = parsedVal;
+    } else {
+      // Keep custom fields exactly as strings or parsed numbers
+      const parsedVal = parseInt(value, 10);
+      validatedRecord[key] = isNaN(parsedVal) ? value : parsedVal;
+    }
+  });
+
+  if (validationError) {
+    return { valid: false, message: validationError };
+  }
 
   return {
     valid: true,
-    record: {
-      roll_number: roll,
-      name,
-      department: dept,
-      lead_talks_delivered: leadTalks,
-      rubiks_cube_events: rubiks,
-      outreach_visits_pups_manivakkam: outreach,
-      mask_off_attendance: maskOff,
-      wellness_score: wellness
-    }
+    record: validatedRecord
   };
 }
 
@@ -242,10 +328,95 @@ export function generateCSVSampleTemplate() {
     'lead_talks_delivered',
     'rubiks_cube_events',
     'outreach_visits_pups_manivakkam',
-    'mask_off_attendance',
-    'wellness_score'
+    'mask_off_attendance'
   ].join(',');
-  const sampleRow1 = '16SAM101,Rohan Sharma,Computer Science,3,2,1,4,85';
-  const sampleRow2 = '16SAM102,Anjali Devi,Information Technology,1,4,3,2,90';
+  const sampleRow1 = 'xxJUyyyzzz,x,y,0,0,0,0';
+  const sampleRow2 = 'xxJUyyyzzz,x,y,0,0,0,0';
   return `${headers}\n${sampleRow1}\n${sampleRow2}`;
+}
+
+export function parseAndValidateMembers(csvText) {
+  const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
+  if (lines.length === 0) {
+    return { success: false, errors: ['File is empty'], validRecords: [] };
+  }
+
+  const rawHeaders = parseCSVLine(lines[0]);
+  let headers = rawHeaders.map(h => {
+    const clean = h.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (clean.includes('roll') || clean.includes('reg') || clean.includes('id') || clean.includes('num')) {
+      return 'roll_number';
+    }
+    if (clean.includes('name') || clean.includes('stud') || clean.includes('full')) {
+      return 'name';
+    }
+    if (clean.includes('pos') || clean.includes('role') || clean.includes('resp')) {
+      return 'position';
+    }
+    if (clean.includes('cont') || clean.includes('mail') || clean.includes('phone') || clean.includes('info')) {
+      return 'contact_info';
+    }
+    return h.trim();
+  });
+
+  // Roll number is optional but name is required
+  if (!headers.includes('name')) {
+    // If we have at least 2 columns, map positionally
+    if (rawHeaders.length >= 2) {
+      headers = rawHeaders.map((h, idx) => {
+        if (idx === 0) return 'roll_number';
+        if (idx === 1) return 'name';
+        if (idx === 2) return 'position';
+        if (idx === 3) return 'contact_info';
+        return h.trim();
+      });
+    } else {
+      headers = ['name'];
+    }
+  }
+
+  const validRecords = [];
+  const errors = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const lineNum = i + 1;
+    const values = parseCSVLine(lines[i]);
+    if (values.length === 1 && values[0] === '') continue;
+
+    const record = {};
+    headers.forEach((header, index) => {
+      record[header] = values[index] || '';
+    });
+
+    const name = (record.name || '').toString().trim();
+    if (!name) {
+      errors.push(`Row ${lineNum}: Missing member name.`);
+      continue;
+    }
+
+    const roll = (record.roll_number || '').toString().trim().toUpperCase();
+    const position = (record.position || 'Member').toString().trim();
+    const contact = (record.contact_info || '').toString().trim();
+
+    const finalMember = {
+      name,
+      roll_number: roll,
+      position,
+      contact_info: contact
+    };
+
+    Object.keys(record).forEach(k => {
+      if (k !== 'name' && k !== 'roll_number' && k !== 'position' && k !== 'contact_info') {
+        finalMember[k] = record[k];
+      }
+    });
+
+    validRecords.push(finalMember);
+  }
+
+  return {
+    success: errors.length === 0,
+    errors,
+    validRecords
+  };
 }
