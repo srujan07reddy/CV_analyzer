@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Plus, Trash2, Upload, Compass, Check, AlertCircle, FileSpreadsheet, X } from 'lucide-react';
+import { Users, Plus, Trash2, Upload, Compass, Check, AlertCircle, FileSpreadsheet, X, MessageCircle } from 'lucide-react';
 import { parseAndValidateMembers } from '../utils/importer';
 
 export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }) {
@@ -10,6 +10,7 @@ export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }
   const [groupName, setGroupName] = useState('');
   const [description, setDescription] = useState('');
   const [motto, setMotto] = useState('');
+  const [whatsappLink, setWhatsappLink] = useState('');
 
   // Inline forms state (keyed by group ID)
   const [activeAddMemberGroup, setActiveAddMemberGroup] = useState(null); // ID of group showing member form
@@ -28,6 +29,7 @@ export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }
   const [editGroupName, setEditGroupName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editMotto, setEditMotto] = useState('');
+  const [editWhatsappLink, setEditWhatsappLink] = useState('');
 
   const handleCreateGroup = (e) => {
     e.preventDefault();
@@ -38,10 +40,20 @@ export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }
       return;
     }
 
+    const formatLink = (link) => {
+      if (!link) return '';
+      const trimmed = link.trim();
+      if (/^https?:\/\//i.test(trimmed)) {
+        return trimmed;
+      }
+      return `https://${trimmed}`;
+    };
+
     const newGroup = {
       name: groupName.trim(),
       description: description.trim(),
       motto: motto.trim(),
+      whatsappLink: formatLink(whatsappLink),
       members: []
     };
 
@@ -51,6 +63,7 @@ export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }
     setGroupName('');
     setDescription('');
     setMotto('');
+    setWhatsappLink('');
     setShowAddGroupForm(false);
   };
 
@@ -187,6 +200,16 @@ export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }
               />
             </div>
             <div className="form-group">
+              <label className="form-label">WhatsApp Group / Contact Link</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="e.g. chat.whatsapp.com/LInK_Id or wa.me/91xxxxxxxxxx" 
+                value={whatsappLink} 
+                onChange={(e) => setWhatsappLink(e.target.value)} 
+              />
+            </div>
+            <div className="form-group">
               <label className="form-label">Group Description</label>
               <textarea 
                 className="form-control" 
@@ -234,6 +257,16 @@ export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }
                     />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>WhatsApp Group Link</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      style={{ padding: '6px' }} 
+                      value={editWhatsappLink} 
+                      onChange={(e) => setEditWhatsappLink(e.target.value)} 
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label" style={{ fontSize: '11px' }}>Description</label>
                     <textarea 
                       className="form-control" 
@@ -252,11 +285,20 @@ export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }
                           alert('Guru garu, group name is required.');
                           return;
                         }
+                        const formatLink = (link) => {
+                          if (!link) return '';
+                          const trimmed = link.trim();
+                          if (/^https?:\/\//i.test(trimmed)) {
+                            return trimmed;
+                          }
+                          return `https://${trimmed}`;
+                        };
                         const updated = {
                           ...group,
                           name: editGroupName.trim(),
                           motto: editMotto.trim(),
-                          description: editDescription.trim()
+                          description: editDescription.trim(),
+                          whatsappLink: formatLink(editWhatsappLink)
                         };
                         onSaveGroup(updated);
                         setEditingGroupId(null);
@@ -278,9 +320,55 @@ export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }
                   <h3 style={{ fontSize: '20px', margin: '0 0 4px 0', color: 'var(--color-primary)' }}>{group.name}</h3>
                   {group.motto && <div style={{ fontSize: '13px', color: 'var(--color-secondary)', fontStyle: 'italic', marginBottom: '8px' }}>"{group.motto}"</div>}
                   <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.5' }}>{group.description || 'No description provided.'}</p>
+                  {group.whatsappLink && (
+                    <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                      <span style={{ color: '#22c55e', display: 'flex', alignItems: 'center' }}><MessageCircle size={12} /></span>
+                      <a 
+                        href={group.whatsappLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={{ color: 'var(--color-secondary)', textDecoration: 'none' }}
+                        onMouseEnter={(e) => { e.target.style.textDecoration = 'underline'; }}
+                        onMouseLeave={(e) => { e.target.style.textDecoration = 'none'; }}
+                      >
+                        {group.whatsappLink}
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
-              <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {group.whatsappLink && (
+                  <a 
+                    href={group.whatsappLink} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="btn" 
+                    style={{ 
+                      padding: '6px 12px', 
+                      background: 'rgba(34, 197, 94, 0.15)', 
+                      color: '#22c55e', 
+                      border: '1px solid rgba(34, 197, 94, 0.3)', 
+                      fontSize: '12px',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontWeight: '500',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = 'rgba(34, 197, 94, 0.25)';
+                      e.target.style.borderColor = 'rgba(34, 197, 94, 0.5)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = 'rgba(34, 197, 94, 0.15)';
+                      e.target.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+                    }}
+                  >
+                    <MessageCircle size={14} /> Message Group
+                  </a>
+                )}
                 <button 
                   className="btn btn-secondary" 
                   onClick={() => {
@@ -315,6 +403,7 @@ export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }
                       setEditGroupName(group.name);
                       setEditDescription(group.description || '');
                       setEditMotto(group.motto || '');
+                      setEditWhatsappLink(group.whatsappLink || '');
                       setActiveAddMemberGroup(null);
                       setActiveBulkGroup(null);
                     }

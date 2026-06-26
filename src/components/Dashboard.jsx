@@ -741,7 +741,7 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
       {/* Roster Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-          <h2 style={{ fontSize: '22px', margin: 0 }}>SDC Student Manifest</h2>
+          <h2 style={{ fontSize: '22px', margin: 0 }}>Student Data</h2>
           {availableYears.length > 0 && (
             <select
               value={selectedYearFilter}
@@ -960,13 +960,13 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
         <div>
           {/* SVG Charts Block */}
           {students.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px', marginBottom: '32px' }}>
               {/* Doughnut Chart */}
-              <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-                <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text-secondary)', alignSelf: 'flex-start' }}>Student Distribution Share</h4>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '24px', width: '100%' }}>
-                  <div style={{ width: '180px', height: '180px', flexShrink: 0 }}>
-                    <svg width="180" height="180" viewBox="0 0 120 120">
+              <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '24px' }}>
+                <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text-secondary)' }}>Student Distribution Share</h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px', width: '100%', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <div style={{ width: '140px', height: '140px', flexShrink: 0 }}>
+                    <svg width="140" height="140" viewBox="0 0 120 120">
                       <circle cx="60" cy="60" r="50" fill="transparent" stroke="rgba(255,255,255,0.03)" strokeWidth="12" />
                       {doughnutSegments.map((seg, idx) => (
                         <circle 
@@ -983,22 +983,22 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
                           style={{ transition: 'stroke-width 0.2s ease', cursor: 'pointer' }}
                         />
                       ))}
-                      <g transform="translate(60, 65)">
-                        <text textAnchor="middle" fill="var(--text-primary)" fontSize="12" fontWeight="700">
+                      <g transform="translate(60, 62)">
+                        <text textAnchor="middle" fill="var(--text-primary)" fontSize="14" fontWeight="700">
                           {totalCount}
                         </text>
-                        <text textAnchor="middle" fill="var(--text-muted)" fontSize="6" dy="8" textTransform="uppercase" letterSpacing="1">
+                        <text textAnchor="middle" fill="var(--text-muted)" fontSize="6" dy="10" textTransform="uppercase" letterSpacing="1">
                           Facilitators
                         </text>
                       </g>
                     </svg>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '180px', width: '100%' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flexGrow: 1, minWidth: '160px' }}>
                     {doughnutSegments.map((seg, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
                         <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: seg.color, flexShrink: 0 }} />
-                        <span style={{ color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '100px' }}>{seg.name}</span>
-                        <span style={{ fontWeight: '600', marginLeft: 'auto' }}>{seg.count} ({seg.percent}%)</span>
+                        <span style={{ color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flexGrow: 1 }}>{seg.name}</span>
+                        <span style={{ fontWeight: '600', marginLeft: '8px', color: 'var(--text-primary)' }}>{seg.count} ({seg.percent}%)</span>
                       </div>
                     ))}
                   </div>

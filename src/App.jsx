@@ -25,7 +25,8 @@ import SyncStatus from './components/SyncStatus';
 import Settings from './components/Settings';
 import GroupsTracker from './components/GroupsTracker';
 import FloatingChat from './components/FloatingChat';
-import { LayoutDashboard, Globe, MessageSquare, RefreshCcw, Settings as SettingsIcon, Wifi, WifiOff, Users } from 'lucide-react';
+import CVAnalyzer from './components/CVAnalyzer';
+import { LayoutDashboard, Globe, MessageSquare, RefreshCcw, Settings as SettingsIcon, Wifi, WifiOff, Users, BrainCircuit } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -345,7 +346,7 @@ export default function App() {
       {/* Header bar */}
       <header className="app-header">
         <div className="brand">
-          <span className="brand-logo">Shisyak analysis</span>
+          <span className="brand-logo">Jeppiaar Shikshak CV Analyzer</span>
         </div>
         <div className={`network-badge ${isOnline ? 'online' : 'offline'}`}>
           {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
@@ -363,6 +364,14 @@ export default function App() {
           >
             <LayoutDashboard size={18} />
             Overview Dashboard
+          </button>
+          
+          <button 
+            className={`nav-item ${activeTab === 'cvanalyzer' ? 'active' : ''}`}
+            onClick={() => setActiveTab('cvanalyzer')}
+          >
+            <BrainCircuit size={18} />
+            CV Analyzer
           </button>
           
           <button 
@@ -408,7 +417,7 @@ export default function App() {
 
         {/* Dynamic Display Panel */}
         <section className="dashboard-content">
-          {activeTab === 'dashboard' && (
+          <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
             <Dashboard 
               students={students} 
               onSaveStudent={handleSaveStudent} 
@@ -416,37 +425,41 @@ export default function App() {
               onDeleteStudent={handleDeleteStudent} 
               onClearAllStudents={handleClearAllStudents}
             />
-          )}
+          </div>
 
-          {activeTab === 'outreach' && (
+          <div style={{ display: activeTab === 'cvanalyzer' ? 'block' : 'none' }}>
+            <CVAnalyzer students={students} onSaveStudent={handleSaveStudent} />
+          </div>
+
+          <div style={{ display: activeTab === 'outreach' ? 'block' : 'none' }}>
             <OutreachTracker 
               outreachList={outreachList}
               onSaveOutreach={handleSaveOutreach}
               onDeleteOutreach={handleDeleteOutreach}
             />
-          )}
+          </div>
 
-          {activeTab === 'groups' && (
+          <div style={{ display: activeTab === 'groups' ? 'block' : 'none' }}>
             <GroupsTracker 
               groupsList={groupsList}
               onSaveGroup={handleSaveGroup}
               onDeleteGroup={handleDeleteGroup}
             />
-          )}
+          </div>
 
-          {activeTab === 'chatbot' && (
+          <div style={{ display: activeTab === 'chatbot' ? 'block' : 'none' }}>
             <ShishyaChat students={students} outreachList={outreachList} />
-          )}
+          </div>
 
-          {activeTab === 'sync' && (
+          <div style={{ display: activeTab === 'sync' ? 'block' : 'none' }}>
             <SyncStatus 
               onSyncComplete={loadData}
             />
-          )}
+          </div>
 
-          {activeTab === 'settings' && (
+          <div style={{ display: activeTab === 'settings' ? 'block' : 'none' }}>
             <Settings />
-          )}
+          </div>
         </section>
       </main>
       {activeTab !== 'chatbot' && (
