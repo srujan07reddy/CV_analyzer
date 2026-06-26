@@ -1,10 +1,10 @@
 // SDC Analytics Platform - Gemini LLM Integration Client
 
-export const DEFAULT_SYSTEM_PROMPT = `You are Shishya, the devoted Student Development Cell (SDC) AI analytics assistant.
+export const DEFAULT_SYSTEM_PROMPT = `You are Shishya, the devoted Jeppiaar Shikshak AI analytics assistant.
 Your Guru (the user) has created this workspace. Speak to them with deep humility, absolute devotion, and respect. Use 'Guru garu' when addressing them and refer to yourself as 'your humble Shishya'.
 Always structure your answers nicely in markdown.
 
-You have access to the ground-truth student roster and outreach logs. You must strictly base all your analytical findings, scores, and details on this data alone. Do not invent any outside students, activities, or locations. If a query refers to an unauthorized external entity (such as vit, iit, srm, ramesh, suresh, etc.), politely refuse or flag it as a violation of ground-truth integrity.`;
+You have access to the ground-truth student roster. You must strictly base all your analytical findings on this data alone — focusing on each student's skills and projects. Do not invent any outside students or details. If a query refers to an unauthorized external entity (such as vit, iit, srm, ramesh, suresh, etc.), politely refuse or flag it as a violation of ground-truth integrity.`;
 
 export function getLLMConfig() {
   try {
@@ -14,7 +14,7 @@ export function getLLMConfig() {
       return {
         apiKey: parsed.apiKey || '',
         endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
-        model: 'gemini-3.5-flash',
+        model: 'gemini-1.5-flash',
         systemPrompt: DEFAULT_SYSTEM_PROMPT,
         enabled: !!parsed.enabled
       };
@@ -25,7 +25,7 @@ export function getLLMConfig() {
   return {
     apiKey: '',
     endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
-    model: 'gemini-3.5-flash',
+    model: 'gemini-1.5-flash',
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     enabled: false
   };
@@ -41,19 +41,17 @@ export function saveLLMConfig(config) {
 /**
  * Builds the context payload to inject into the LLM system instructions
  */
-export function buildDataContextPrompt(studentsList = [], outreachList = []) {
+export function buildDataContextPrompt(studentsList = []) {
   const standardKeys = new Set([
     'roll_number',
     'name',
     'department',
-    'lead_talks_delivered',
-    'rubiks_cube_events',
-    'outreach_visits_pups_manivakkam',
-    'mask_off_attendance'
+    'top_skills',
+    'projects'
   ]);
 
   const studentsStr = studentsList.map(s => {
-    let base = `- Roll: ${s.roll_number}, Name: ${s.name}, Dept: ${s.department}, Lead Talks: ${s.lead_talks_delivered}, Rubik's Events: ${s.rubiks_cube_events}, Outreach Visits: ${s.outreach_visits_pups_manivakkam}, MASK OFF Attendance: ${s.mask_off_attendance}`;
+    let base = `- Roll: ${s.roll_number}, Name: ${s.name}, Dept: ${s.department}, Skills: ${s.top_skills || s.skills || ''}, Projects: ${s.projects || ''}`;
     const customParts = [];
     Object.keys(s).forEach(key => {
       if (!standardKeys.has(key)) {
@@ -66,19 +64,11 @@ export function buildDataContextPrompt(studentsList = [], outreachList = []) {
     return base;
   }).join('\n');
 
-  const outreachStr = outreachList.map(o => {
-    const facilitators = Array.isArray(o.facilitator_rolls) ? o.facilitator_rolls.join(', ') : o.facilitator_rolls;
-    return `- ID: ${o.id || 'N/A'}, Target Location: ${o.target_location}, Program: ${o.program_classification}, Facilitators: ${facilitators || 'N/A'}, Volume: ${o.training_volume || 0} sessions, Date: ${new Date(o.timestamp).toLocaleDateString()}`;
-  }).join('\n');
-
   return `
 Here is the active SDC Ground-Truth Dataset. Use ONLY this information.
 
 --- ACTIVE STUDENT ROSTER ---
 ${studentsStr || 'No student records loaded.'}
-
---- OUTREACH VISIT LOGS ---
-${outreachStr || 'No outreach sessions logged.'}
 ---
 `;
 }
@@ -86,13 +76,13 @@ ${outreachStr || 'No outreach sessions logged.'}
 /**
  * Dispatches a prompt to the Gemini API
  */
-export async function queryLLM(userPrompt, studentsList = [], outreachList = []) {
+export async function queryLLM(userPrompt, studentsList = []) {
   const config = getLLMConfig();
   if (!config.enabled) {
     throw new Error('LLM integration is disabled or not configured.');
   }
 
-  const systemInstructions = `${config.systemPrompt}\n\n${buildDataContextPrompt(studentsList, outreachList)}`;
+  const systemInstructions = `${config.systemPrompt}\n\n${buildDataContextPrompt(studentsList)}`;
 
   return callGemini(config.apiKey, config.endpoint, config.model, systemInstructions, userPrompt);
 }
@@ -102,7 +92,7 @@ async function callGemini(apiKey, endpoint, model, systemInstruction, prompt) {
     throw new Error('Gemini API Key is missing. Please configure it in Settings.');
   }
   
-  const modelName = model || 'gemini-3.5-flash';
+  const modelName = model || 'gemini-1.5-flash';
   const baseUrl = endpoint || 'https://generativelanguage.googleapis.com/v1beta/models';
   
   // Format target URL

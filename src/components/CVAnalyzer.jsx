@@ -175,17 +175,37 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
   const runLocalHeuristicsParser = (text, rollHint = '') => {
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     
-    // 1. Extract Name (guess from top lines)
-    let extractedName = 'x';
-    const ignoreNameWords = ['resume', 'cv', 'curriculum', 'vitae', 'page', 'email', 'phone', 'contact', 'address', 'profile'];
-    for (let i = 0; i < Math.min(5, lines.length); i++) {
-      const line = lines[i];
-      const lowerLine = line.toLowerCase();
-      const hasIgnoreWord = ignoreNameWords.some(w => lowerLine.includes(w));
-      const wordCount = line.split(/\s+/).length;
-      if (!hasIgnoreWord && wordCount >= 2 && wordCount <= 4 && /^[a-zA-Z\s.]+$/.test(line)) {
-        extractedName = line;
-        break;
+    // 1. Extract Name (guess from top lines by checking segments and common delimiters)
+    let extractedName = 'Candidate';
+    if (lines.length > 0) {
+      const firstLine = lines[0];
+      const segments = firstLine.split(/[-—|•,\/]/);
+      const firstSegment = segments[0].trim();
+      const cleanSegment = firstSegment
+        .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '')
+        .replace(/https?:\/\/\S+/gi, '')
+        .replace(/(?:linkedin|github|portfolio|resume|cv)/gi, '')
+        .replace(/[^a-zA-Z\s.]/g, '')
+        .trim();
+      const words = cleanSegment.split(/\s+/).filter(w => w.length > 1);
+      if (words.length >= 2 && words.length <= 4) {
+        extractedName = words.join(' ');
+      } else {
+        // Fallback to checking first 3 lines
+        for (let i = 0; i < Math.min(3, lines.length); i++) {
+          const line = lines[i];
+          const cleanLine = line
+            .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '')
+            .replace(/https?:\/\/\S+/gi, '')
+            .replace(/(?:linkedin|github|portfolio|resume|cv)/gi, '')
+            .replace(/[^a-zA-Z\s.]/g, '')
+            .trim();
+          const lineWords = cleanLine.split(/\s+/).filter(w => w.length > 1);
+          if (lineWords.length >= 2 && lineWords.length <= 4) {
+            extractedName = lineWords.join(' ');
+            break;
+          }
+        }
       }
     }
 
@@ -221,30 +241,79 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
       return match ? parseInt(match[1], 10) : 0;
     };
 
-    const talksCount = parseCount(/(\d+)\s*(?:lead\s*talks|talks\s*delivered|talks\s*presented|seminars\s*delivered)/i, text);
-    const rubiksCount = parseCount(/(\d+)\s*(?:rubik|cube\s*event|cube\s*training|rubiks)/i, text);
-    const outreachCount = parseCount(/(\d+)\s*(?:outreach|pups|manivakkam|school\s*visit)/i, text);
-    const maskoffCount = parseCount(/(\d+)\s*(?:mask\s*off|maskoff|wellness\s*attendance)/i, text);
-
     // 5. Extract Custom Skills
     const skillKeywords = ['React', 'Node', 'Python', 'Java', 'Javascript', 'C++', 'SQL', 'Git', 'HTML', 'CSS', 'Cloud', 'Docker', 'Figma'];
-    const foundSkills = skillKeywords.filter(skill => 
-      new RegExp(`\\b${skill}\\b`, 'i').test(text)
-    );
+    const foundSkills = skillKeywords.filter(skill => {
+      const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const boundaryEnd = /\w$/.test(skill) ? '\\b' : '(?!\\w)';
+      const regex = new RegExp(`\\b${escaped}${boundaryEnd}`, 'i');
+      return regex.test(text);
+    });
+
+    // 6. Extract Projects Heuristic
+    let projectsList = [];
+    const projectKeywords = ['projects', 'key projects', 'academic projects', 'personal projects', 'technical projects', 'mini projects', 'major project'];
+    let startIndex = -1;
+    let matchKeyword = '';
+    
+    for (const kw of projectKeywords) {
+      const idx = lowerText.indexOf(kw);
+      if (idx !== -1 && (startIndex === -1 || idx < startIndex)) {
+        const before = idx === 0 ? '\n' : text[idx - 1];
+        if (before === '\n' || before === '\r' || before === ' ' || before === '\t') {
+          startIndex = idx + kw.length;
+          matchKeyword = kw;
+        }
+      }
+    }
+    
+    if (startIndex !== -1) {
+      const remainingText = text.slice(startIndex);
+      const projLines = remainingText.split('\n');
+      const stopKeywords = ['skills', 'technical skills', 'education', 'experience', 'work experience', 'certifications', 'achievements', 'co-curricular', 'extracurricular', 'languages', 'hobbies', 'declarations', 'declaration'];
+      
+      for (let i = 0; i < projLines.length; i++) {
+        const line = projLines[i].trim();
+        if (!line) continue;
+        
+        const lowerLine = line.toLowerCase();
+        const isHeader = stopKeywords.some(kw => 
+          lowerLine === kw || 
+          lowerLine === kw + ':' || 
+          (lowerLine.length < 30 && (lowerLine.startsWith(kw) || lowerLine.endsWith(kw)) && (line === line.toUpperCase() || line.includes(':')))
+        );
+        if (isHeader) break;
+        if (projectsList.length >= 5 || i > 15) break;
+        
+        const isBullet = line.startsWith('•') || line.startsWith('-') || line.startsWith('*') || /^\d+[\.\)]/.test(line);
+        if (isBullet) {
+          const cleanLine = line.replace(/^[-•\*\d\.\)\s]+/, '').trim();
+          if (cleanLine.length > 5 && cleanLine.length < 100 && /^[A-Z]/.test(cleanLine)) {
+            const descIndex = cleanLine.search(/(?:\s+-\s+|\s+:\s+|\s+using\s+|\s+developed\s+|\s+built\s+)/i);
+            const projName = descIndex !== -1 ? cleanLine.slice(0, descIndex).trim() : cleanLine;
+            if (projName && projName.length > 3 && projName.length < 60 && !projectsList.includes(projName)) {
+              projectsList.push(projName);
+            }
+          }
+        } else if (line.length > 5 && line.length < 60 && /^[A-Z]/.test(line) && !line.includes(':')) {
+          if (!projectsList.includes(line)) {
+            projectsList.push(line);
+          }
+        }
+      }
+    }
+    const projects = projectsList.join(', ') || 'Cybersecurity Vulnerability Assessment, Full-Stack App Development';
 
     return {
       student: {
         roll_number: rollNumber,
         name: extractedName,
         department,
-        lead_talks_delivered: talksCount,
-        rubiks_cube_events: rubiksCount,
-        outreach_visits_pups_manivakkam: outreachCount,
-        mask_off_attendance: maskoffCount,
         top_skills: foundSkills.join(', ') || 'General Facilitation',
+        projects,
         experience_summary: lines.slice(0, 10).join(' ').slice(0, 120) + '...'
       },
-      assessment: `### Local Heuristic Assessment (Fallback Mode)\n\n**Candidate Profile:**\n- Extracted Name: **${extractedName}**\n- Roll Number: **${rollNumber}**\n- Target Department: **${department}**\n\n**Extracted SDC Facilitation Activities:**\n- Lead Talks Delivered: **${talksCount}**\n- Rubik's Cube Events: **${rubiksCount}**\n- Community Outreach Visits: **${outreachCount}**\n- MASK OFF Sessions Attended: **${maskoffCount}**\n\n*Note: Gemini AI settings are disabled or offline. Running localized regex heuristics rules to extract manifest metadata.*`
+      assessment: `### Local Heuristic Assessment (Fallback Mode)\n\n**Candidate Profile:**\n- Extracted Name: **${extractedName}**\n- Roll Number: **${rollNumber}**\n- Target Department: **${department}**\n\n*Note: Gemini AI settings are disabled or offline. Running localized regex heuristics rules to extract manifest metadata.*`
     };
   };
 
@@ -291,11 +360,8 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
           roll_number: parsed.roll_number || defaultRollNumber || 'xxJUyyyzzz',
           name: parsed.name || 'x',
           department: parsed.department || 'Computer Science',
-          lead_talks_delivered: parseInt(parsed.lead_talks_delivered) || 0,
-          rubiks_cube_events: parseInt(parsed.rubiks_cube_events) || 0,
-          outreach_visits_pups_manivakkam: parseInt(parsed.outreach_visits_pups_manivakkam) || 0,
-          mask_off_attendance: parseInt(parsed.mask_off_attendance) || 0,
           top_skills: parsed.top_skills || 'General Facilitation',
+          projects: parsed.projects || '',
           experience_summary: parsed.experience_summary || ''
         });
 
@@ -349,11 +415,8 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
             roll_number: parsed.roll_number || rollHint || 'xxJUyyyzzz',
             name: parsed.name || 'x',
             department: parsed.department || 'Computer Science',
-            lead_talks_delivered: parseInt(parsed.lead_talks_delivered) || 0,
-            rubiks_cube_events: parseInt(parsed.rubiks_cube_events) || 0,
-            outreach_visits_pups_manivakkam: parseInt(parsed.outreach_visits_pups_manivakkam) || 0,
-            mask_off_attendance: parseInt(parsed.mask_off_attendance) || 0,
             top_skills: parsed.top_skills || 'General Facilitation',
+            projects: parsed.projects || '',
             experience_summary: parsed.experience_summary || ''
           },
           assessment: parsed.executive_assessment || 'No summary assessment generated.'
@@ -382,29 +445,6 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
     }
     
     const details = [];
-    const talksDiff = (parsedStudent.lead_talks_delivered || 0) - (existing.lead_talks_delivered || 0);
-    const rubiksDiff = (parsedStudent.rubiks_cube_events || 0) - (existing.rubiks_cube_events || 0);
-    
-    // Find outreach visits count
-    const existingOutreachKey = Object.keys(existing).find(k => {
-      const clean = k.toLowerCase().replace(/[^a-z0-9_]/g, '');
-      return clean.includes('outreach') || clean.includes('visit') || clean.includes('pups');
-    }) || 'Outreach Visits';
-    const existingOutreachVal = parseInt(existing[existingOutreachKey] || 0, 10);
-    const outreachDiff = (parsedStudent.outreach_visits_pups_manivakkam || 0) - existingOutreachVal;
-    
-    // Find maskoff count
-    const existingMaskoffKey = Object.keys(existing).find(k => {
-      const clean = k.toLowerCase().replace(/[^a-z0-9_]/g, '');
-      return clean.includes('mask') || clean.includes('off');
-    }) || 'MASK OFF Attendance';
-    const existingMaskoffVal = parseInt(existing[existingMaskoffKey] || 0, 10);
-    const maskoffDiff = (parsedStudent.mask_off_attendance || 0) - existingMaskoffVal;
-
-    if (talksDiff > 0) details.push(`+${talksDiff} Lead Talks`);
-    if (rubiksDiff > 0) details.push(`+${rubiksDiff} Rubik's Cube`);
-    if (outreachDiff > 0) details.push(`+${outreachDiff} Outreach Visits`);
-    if (maskoffDiff > 0) details.push(`+${maskoffDiff} MASK OFF`);
     
     // Compare skills
     const existingSkills = existing.top_skills || existing.skills || '';
@@ -731,38 +771,56 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '6px' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Full Name</span>
-                      <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{parsedStudent.name}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '6px' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Roll Number</span>
-                      <span style={{ fontWeight: '600', fontFamily: 'monospace', color: 'var(--color-primary)' }}>{parsedStudent.roll_number}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '6px' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Department</span>
-                      <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{parsedStudent.department}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '6px' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Lead Talks Delivered</span>
-                      <span style={{ fontWeight: '600', color: 'var(--color-secondary)' }}>{parsedStudent.lead_talks_delivered}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '6px' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Rubik's Cube Events</span>
-                      <span style={{ fontWeight: '600', color: 'var(--color-secondary)' }}>{parsedStudent.rubiks_cube_events}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '6px' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Outreach Visits (PUPS)</span>
-                      <span style={{ fontWeight: '600', color: 'var(--color-secondary)' }}>{parsedStudent.outreach_visits_pups_manivakkam}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '6px' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>MASK OFF Attendance</span>
-                      <span style={{ fontWeight: '600', color: 'var(--color-secondary)' }}>{parsedStudent.mask_off_attendance}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Full Name</label>
+                      <input 
+                        type="text" 
+                        value={parsedStudent.name} 
+                        onChange={(e) => setParsedStudent(prev => ({ ...prev, name: e.target.value }))}
+                        style={{ fontSize: '13px', background: 'rgba(255,255,255,0.02)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px 10px', width: '100%', outline: 'none' }}
+                      />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Top Extracted Skills</span>
-                      <span style={{ color: 'var(--color-primary)', fontWeight: '600' }}>{parsedStudent.top_skills}</span>
+                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Roll Number</label>
+                      <input 
+                        type="text" 
+                        value={parsedStudent.roll_number} 
+                        onChange={(e) => setParsedStudent(prev => ({ ...prev, roll_number: e.target.value.toUpperCase() }))}
+                        style={{ fontSize: '13px', fontFamily: 'monospace', background: 'rgba(255,255,255,0.02)', color: 'var(--color-primary)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px 10px', width: '100%', outline: 'none' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Department</label>
+                      <select 
+                        value={parsedStudent.department} 
+                        onChange={(e) => setParsedStudent(prev => ({ ...prev, department: e.target.value }))}
+                        style={{ fontSize: '13px', background: '#0f172a', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px 10px', width: '100%', outline: 'none', cursor: 'pointer' }}
+                      >
+                        <option value="Computer Science">Computer Science</option>
+                        <option value="Information Technology">Information Technology</option>
+                        <option value="Electronics & Communication">Electronics & Communication</option>
+                        <option value="Mechanical Engineering">Mechanical Engineering</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Top Extracted Skills</label>
+                      <input 
+                        type="text" 
+                        value={parsedStudent.top_skills} 
+                        onChange={(e) => setParsedStudent(prev => ({ ...prev, top_skills: e.target.value }))}
+                        style={{ fontSize: '13px', background: 'rgba(255,255,255,0.02)', color: 'var(--color-primary)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px 10px', width: '100%', outline: 'none' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Projects</label>
+                      <input 
+                        type="text" 
+                        value={parsedStudent.projects || ''} 
+                        onChange={(e) => setParsedStudent(prev => ({ ...prev, projects: e.target.value }))}
+                        placeholder="e.g. VPN security architecture, AI agent development"
+                        style={{ fontSize: '13px', background: 'rgba(255,255,255,0.02)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px 10px', width: '100%', outline: 'none' }}
+                      />
                     </div>
                   </div>
 

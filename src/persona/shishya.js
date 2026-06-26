@@ -17,15 +17,9 @@ export function processShishyaQuery(rawQuery, currentStudents = []) {
   const studentsList = currentStudents.length > 0 ? currentStudents : seedStudents;
   const authorizedRolls = new Set(studentsList.map(s => s.roll_number.toLowerCase()));
   const authorizedNames = new Set(studentsList.map(s => s.name.toLowerCase()));
-  const authorizedDepts = new Set(['computer science', 'information technology', 'electronics & communication', 'mechanical engineering']);
-  const authorizedLocations = new Set(['pups manivakkam', 'manivakkam']);
-  const authorizedEvents = new Set(['rubik\'s cube', 'rubiks cube', 'maths club', 'mask off', 'lead talks']);
 
   // Pre-check for unauthorized external names or terms to satisfy Constraint #1 and #2
   // We scan the query for name-like nouns or terms not present in our authorized vocabulary
-  const words = query.split(/\s+/);
-  
-  // Simple heuristic check: if the query contains common out-of-context names or locations not authorized
   const suspectedEntities = ['ramesh', 'suresh', 'anna university', 'pups tambaram', 'iit', 'vit', 'srm'];
   for (const entity of suspectedEntities) {
     if (query.includes(entity)) {
@@ -42,16 +36,12 @@ export function processShishyaQuery(rawQuery, currentStudents = []) {
     'roll_number',
     'name',
     'department',
-    'lead_talks_delivered',
-    'rubiks_cube_events',
-    'outreach_visits_pups_manivakkam',
-    'mask_off_attendance'
+    'top_skills',
+    'projects'
   ]);
 
   // Route 1: Show/List all students
   if (query.includes('list') || query.includes('show all') || query.includes('students')) {
-
-
     const rosterRows = studentsList.map(s => {
       let base = `• ${s.name} (${s.roll_number}) - Dept: ${s.department}`;
       const customParts = [];
@@ -97,10 +87,8 @@ export function processShishyaQuery(rawQuery, currentStudents = []) {
       `Name: ${foundStudent.name}`,
       `Roll Number: ${foundStudent.roll_number}`,
       `Department: ${foundStudent.department}`,
-      `Lead Talks: ${foundStudent.lead_talks_delivered}`,
-      `Rubik's Cube Events: ${foundStudent.rubiks_cube_events}`,
-      `Outreach Visits (PUPS Manivakkam): ${foundStudent.outreach_visits_pups_manivakkam}`,
-      `MASK OFF Attendance: ${foundStudent.mask_off_attendance}`
+      `Skills: ${foundStudent.top_skills || foundStudent.skills || ''}`,
+      `Projects: ${foundStudent.projects || ''}`
     ];
 
     Object.keys(foundStudent).forEach(key => {
@@ -114,32 +102,6 @@ export function processShishyaQuery(rawQuery, currentStudents = []) {
     return {
       response: formatResponse(`I have retrieved the authentic record for student ${foundStudent.name} from the local database:\n\n  ${detailsStr}`),
       data: foundStudent
-    };
-  }
-
-  // Route 3: Outreach metrics lookup
-  if (query.includes('outreach') || query.includes('manivakkam') || query.includes('pups')) {
-    const totalVisits = studentsList.reduce((sum, s) => sum + (s.outreach_visits_pups_manivakkam || 0), 0);
-    return {
-      response: formatResponse(`I have calculated our community outreach impact. Total visits to PUPS Manivakkam stand at ${totalVisits} across all facilitators.`),
-      data: { location: 'PUPS Manivakkam', totalVisits }
-    };
-  }
-
-  // Route 4: Event info lookup (e.g. Rubik's Cube, MASK OFF)
-  if (query.includes('rubik') || query.includes('cube')) {
-    const totalEvents = studentsList.reduce((sum, s) => sum + (s.rubiks_cube_events || 0), 0);
-    return {
-      response: formatResponse(`Regarding the Rubik's Cube sessions: facilitators have conducted/supported a combined total of ${totalEvents} sessions.`),
-      data: { event: 'Rubik\'s Cube', count: totalEvents }
-    };
-  }
-
-  if (query.includes('mask off')) {
-    const totalWellnessAttendance = studentsList.reduce((sum, s) => sum + (s.mask_off_attendance || 0), 0);
-    return {
-      response: formatResponse(`Regarding the "MASK OFF" sessions: our records indicate a total attendance volume of ${totalWellnessAttendance} student-sessions.`),
-      data: { seminar: 'MASK OFF', totalWellnessAttendance }
     };
   }
 

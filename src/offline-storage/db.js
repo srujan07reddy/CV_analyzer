@@ -1,6 +1,6 @@
-// SDC Analytics Platform - Local IndexedDB Manager
+// Jeppiaar Shikshak Platform - Local IndexedDB Manager
 const DB_NAME = 'SDC_Analytics_DB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export function initDB() {
   return new Promise((resolve, reject) => {
@@ -43,6 +43,20 @@ export function initDB() {
       if (!db.objectStoreNames.contains('groups')) {
         db.createObjectStore('groups', { keyPath: 'id', autoIncrement: true });
         console.log('[DB] Created object store: groups');
+      }
+
+      // Store 5: Management → Student Messages
+      // Schema: { id (auto), roll_number, title, body, timestamp, read }
+      if (!db.objectStoreNames.contains('messages')) {
+        db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+        console.log('[DB] Created object store: messages');
+      }
+
+      // Store 6: Management Templates
+      // Schema: { id (auto), name, sections: ["Skills","Projects"], timestamp }
+      if (!db.objectStoreNames.contains('templates')) {
+        db.createObjectStore('templates', { keyPath: 'id', autoIncrement: true });
+        console.log('[DB] Created object store: templates');
       }
     };
   });
@@ -127,6 +141,46 @@ export function deleteGroup(id) {
 
 export function clearAllGroups() {
   return runTransaction('groups', 'readwrite', (store) => store.clear());
+}
+
+// Messages CRUD (Management → Student)
+export function getAllMessages() {
+  return runTransaction('messages', 'readonly', (store) => store.getAll());
+}
+
+export function getMessagesByRoll(roll_number) {
+  return getAllMessages().then(all =>
+    all.filter(m => m.roll_number === roll_number.toUpperCase() || m.roll_number === 'ALL')
+  );
+}
+
+export function saveMessage(message) {
+  return runTransaction('messages', 'readwrite', (store) => store.put(message));
+}
+
+export function deleteMessage(id) {
+  return runTransaction('messages', 'readwrite', (store) => store.delete(id));
+}
+
+export function clearAllMessages() {
+  return runTransaction('messages', 'readwrite', (store) => store.clear());
+}
+
+// Templates CRUD (Management-defined profile sections)
+export function getAllTemplates() {
+  return runTransaction('templates', 'readonly', (store) => store.getAll());
+}
+
+export function saveTemplate(template) {
+  return runTransaction('templates', 'readwrite', (store) => store.put(template));
+}
+
+export function deleteTemplate(id) {
+  return runTransaction('templates', 'readwrite', (store) => store.delete(id));
+}
+
+export function clearAllTemplates() {
+  return runTransaction('templates', 'readwrite', (store) => store.clear());
 }
 
 // Sync Queue Helpers

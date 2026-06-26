@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Industry 6.0 Student Analytics Caching Dashboard Module
+Jeppiaar Shikshak — Student Analytics Caching Module
 Provides local pandas-driven pre-aggregation, SQLite reports caching,
 and token-efficient, on-demand AI portfolio evaluations.
 """
@@ -31,8 +31,7 @@ class StudentAnalyticsEngine:
 
     def compute_student_metrics(self, df: pd.DataFrame, student_id: str):
         """
-        Calculates student averages, track match scoring, technology tags, and percentages.
-        Performs all mathematical logic locally using pandas to minimize token usage.
+        Calculates student analytics, including parsed technology tags and projects list.
         """
         # Find student row
         student_row = df[df['roll_number'].str.upper() == student_id.upper()]
@@ -41,62 +40,15 @@ class StudentAnalyticsEngine:
 
         student_data = student_row.iloc[0]
 
-        # Calculate overall class averages for context
-        avg_talks = df['lead_talks_delivered'].mean()
-        avg_rubiks = df['rubiks_cube_events'].mean()
-        
-        # Handle dynamic outreach key matching (since outreach visits column name can vary)
-        outreach_col = [col for col in df.columns if 'outreach' in col.lower() or 'visit' in col.lower()]
-        outreach_val = student_data[outreach_col[0]] if outreach_col else 0
-        avg_outreach = df[outreach_col[0]].mean() if outreach_col else 0
-
-        # Handle mask off column matching
-        maskoff_col = [col for col in df.columns if 'mask' in col.lower() or 'off' in col.lower()]
-        maskoff_val = student_data[maskoff_col[0]] if maskoff_col else 0
-        avg_maskoff = df[maskoff_col[0]].mean() if maskoff_col else 0
-
-        # Percentages relative to high benchmarks (e.g. target 10 sessions)
-        percentage_metrics = {
-            'lead_talks': min(100.0, float(student_data['lead_talks_delivered']) / 10.0 * 100),
-            'rubiks': min(100.0, float(student_data['rubiks_cube_events']) / 10.0 * 100),
-            'outreach': min(100.0, float(outreach_val) / 10.0 * 100),
-            'maskoff': min(100.0, float(maskoff_val) / 10.0 * 100)
-        }
-
-        # Track Match Scoring (Weighted indices scaled to 100 max)
         skills_list = [s.strip() for s in str(student_data.get('top_skills', '')).split(',') if s.strip()]
-        skills_count = len(skills_list)
-        
-        # Track A: Technical Facilitator Score (weighted)
-        tech_score = (0.5 * student_data['lead_talks_delivered'] + 
-                      0.3 * student_data['rubiks_cube_events'] + 
-                      0.2 * min(10, skills_count)) * 10.0
-        
-        # Track B: Community Engagement Score (weighted)
-        community_score = (0.6 * outreach_val + 0.4 * maskoff_val) * 10.0
-
-        track_scores = {
-            'Technical Facilitator Track': min(100.0, tech_score),
-            'Community Engagement Track': min(100.0, community_score)
-        }
+        projects_str = str(student_data.get('projects', ''))
 
         return {
             'student_id': student_id,
             'name': student_data['name'],
             'department': student_data['department'],
-            'lead_talks_delivered': int(student_data['lead_talks_delivered']),
-            'rubiks_cube_events': int(student_data['rubiks_cube_events']),
-            'outreach_visits': int(outreach_val),
-            'mask_off_attendance': int(maskoff_val),
             'skills': skills_list,
-            'averages': {
-                'lead_talks': round(avg_talks, 2),
-                'rubiks': round(avg_rubiks, 2),
-                'outreach': round(avg_outreach, 2),
-                'maskoff': round(avg_maskoff, 2)
-            },
-            'percentages': percentage_metrics,
-            'track_scores': track_scores
+            'projects': projects_str
         }
 
     def generate_ai_insight(self, student_id: str, metrics: dict, api_key: str = None) -> tuple:
@@ -108,12 +60,10 @@ class StudentAnalyticsEngine:
         # Generate condensed metrics representation for hashing
         condensed = {
             'id': student_id,
-            'talks': metrics['lead_talks_delivered'],
-            'rubiks': metrics['rubiks_cube_events'],
-            'outreach': metrics['outreach_visits'],
-            'maskoff': metrics['mask_off_attendance'],
+            'name': metrics['name'],
+            'department': metrics['department'],
             'skills': sorted(metrics['skills']),
-            'tracks': metrics['track_scores']
+            'projects': metrics['projects']
         }
         metrics_str = json.dumps(condensed, sort_keys=True)
         metrics_hash = hashlib.md5(metrics_str.encode('utf-8')).hexdigest()
@@ -138,23 +88,18 @@ class StudentAnalyticsEngine:
             genai.configure(api_key=api_key)
             
             system_prompt = (
-                "Act as an Industry 6.0 engineering assessor. Summarize the provided student metrics "
-                "into a 3-sentence technical portfolio evaluation. Do not include conversational filler or introductions."
+                "Act as a Jeppiaar Shikshak faculty assessor. Summarize the provided student's skills "
+                "and projects into a 3-sentence technical portfolio evaluation. Do not include conversational filler or introductions."
             )
             
             prompt = f"""
 Candidate: {metrics['name']} ({metrics['department']})
-Metrics:
-- Lead Talks Delivered: {metrics['lead_talks_delivered']} (Class Avg: {metrics['averages']['lead_talks']})
-- Rubik's Cube Events: {metrics['rubiks_cube_events']} (Class Avg: {metrics['averages']['rubiks']})
-- Community Outreach: {metrics['outreach_visits']} (Class Avg: {metrics['averages']['outreach']})
-- MASK OFF Sessions: {metrics['mask_off_attendance']} (Class Avg: {metrics['averages']['maskoff']})
-- Track Scores: {json.dumps(metrics['track_scores'])}
-- Technology Skills: {', '.join(metrics['skills'])}
+Technology Skills: {', '.join(metrics['skills'])}
+Key Projects: {metrics['projects']}
 """
             
             model = genai.GenerativeModel(
-                model_name='gemini-2.5-flash',
+                model_name='gemini-1.5-flash',
                 generation_config={
                     "max_output_tokens": 150,
                     "temperature": 0.2,
@@ -183,61 +128,17 @@ Metrics:
         Graceful fallback to standard Python metrics and rule-based evaluation
         if the API encounters a rate limit or network issue.
         """
-        best_track = max(metrics['track_scores'], key=metrics['track_scores'].get)
-        score = metrics['track_scores'][best_track]
-        
         fallback_text = (
             f"[Local Assessment Fallback - Rate Limited/Offline: {error_msg}]\n"
-            f"Candidate {metrics['name']} demonstrates primary readiness for the {best_track} "
-            f"with a score of {score:.1f}/100. Local analysis shows solid contributions "
-            f"including {metrics['lead_talks_delivered']} Lead Talks and {metrics['rubiks_cube_events']} Rubik's Cube events, "
-            f"complemented by technology skills: {', '.join(metrics['skills'] or ['General Facilitation'])}."
+            f"Candidate {metrics['name']} is evaluated based on local portfolio data. "
+            f"Key projects include: {metrics['projects'] or 'None listed'}. "
+            f"Technology skills: {', '.join(metrics['skills'] or ['General Engineering'])}."
         )
         return fallback_text
 
-# Mock Seed Data for instantaneous local calculations
-MOCK_DATA = [
-    {
-        "roll_number": "20JUCSE001",
-        "name": "Arjun Sharma",
-        "department": "Computer Science",
-        "lead_talks_delivered": 4,
-        "rubiks_cube_events": 6,
-        "Outreach Visits": 5,
-        "MASK OFF Attendance": 8,
-        "top_skills": "Python, SQL, React, Cloud"
-    },
-    {
-        "roll_number": "20JUCSE002",
-        "name": "Bhavana Reddy",
-        "department": "Computer Science",
-        "lead_talks_delivered": 2,
-        "rubiks_cube_events": 8,
-        "Outreach Visits": 7,
-        "MASK OFF Attendance": 4,
-        "top_skills": "Java, HTML, CSS, Figma"
-    },
-    {
-        "roll_number": "20JUITS015",
-        "name": "Charan Kumar",
-        "department": "Information Technology",
-        "lead_talks_delivered": 7,
-        "rubiks_cube_events": 3,
-        "Outreach Visits": 2,
-        "MASK OFF Attendance": 6,
-        "top_skills": "React, Node, Javascript, Git"
-    },
-    {
-        "roll_number": "20JUECE088",
-        "name": "Divya N",
-        "department": "Electronics & Communication",
-        "lead_talks_delivered": 5,
-        "rubiks_cube_events": 5,
-        "Outreach Visits": 9,
-        "MASK OFF Attendance": 10,
-        "top_skills": "Python, C++, Docker, Cloud"
-    }
-]
+# No pre-loaded mock data — students are imported via CSV/JSON in the front-end.
+# This list can be populated with real student records when running the CLI.
+MOCK_DATA = []
 
 # Check streamlit availability
 try:
@@ -248,12 +149,12 @@ except ImportError:
 
 if HAS_STREAMLIT:
     # streamlit layout
-    st.set_page_config(page_title="Industry 6.0 Student Analytics Dashboard", layout="wide")
+    st.set_page_config(page_title="Jeppiaar Shikshak - Student Analytics Dashboard", layout="wide")
 
     st.markdown("""
         <div style="background: rgba(6, 182, 212, 0.08); padding: 16px; border-radius: 12px; border: 1px solid rgba(6, 182, 212, 0.2); margin-bottom: 24px;">
-            <h1 style="color: #06b6d4; margin: 0; font-size: 28px;">🚀 Industry 6.0 Student Analytics</h1>
-            <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 14px;">Local pre-aggregation caching dashboard with Gemini-Flash narrative automation.</p>
+            <h1 style="color: #06b6d4; margin: 0; font-size: 28px;">📘 Jeppiaar Shikshak — Student Analytics</h1>
+            <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 14px;">Local caching dashboard with Gemini-Flash narrative automation for portfolio assessment.</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -272,28 +173,10 @@ if HAS_STREAMLIT:
         # 1. Pure Python calculations rendered instantly
         metrics = engine.compute_student_metrics(df_students, selected_id)
 
-        col1, col2 = st.columns([1, 1])
-
-        with col1:
-            st.subheader(f"Profile: {metrics['name']} ({metrics['student_id']})")
-            st.markdown(f"**Department:** {metrics['department']}")
-            st.markdown(f"**Technology Tags:** {', '.join(metrics['skills'])}")
-            
-            # Metric scores
-            st.write("#### Performance Summary")
-            perf_df = pd.DataFrame({
-                'Metric': ['Lead Talks', 'Rubik\'s Cube', 'Outreach Visits', 'MASK OFF Attendance'],
-                'Score': [metrics['lead_talks_delivered'], metrics['rubiks_cube_events'], metrics['outreach_visits'], metrics['mask_off_attendance']],
-                'Class Avg': [metrics['averages']['lead_talks'], metrics['averages']['rubiks'], metrics['averages']['outreach'], metrics['averages']['maskoff']]
-            })
-            st.table(perf_df)
-
-        with col2:
-            st.subheader("Competency Tracks Match")
-            for track, score in metrics['track_scores'].items():
-                st.markdown(f"**{track}**")
-                st.progress(score / 100.0)
-                st.write(f"Competency score: `{score:.1f}/100`")
+        st.subheader(f"Profile: {metrics['name']} ({metrics['student_id']})")
+        st.markdown(f"**Department:** {metrics['department']}")
+        st.markdown(f"**Technology Tags:** {', '.join(metrics['skills'])}")
+        st.markdown(f"**Key Projects:** {metrics['projects']}")
 
         st.divider()
 
@@ -309,12 +192,10 @@ if HAS_STREAMLIT:
             # Compute current hash
             condensed = {
                 'id': selected_id,
-                'talks': metrics['lead_talks_delivered'],
-                'rubiks': metrics['rubiks_cube_events'],
-                'outreach': metrics['outreach_visits'],
-                'maskoff': metrics['mask_off_attendance'],
+                'name': metrics['name'],
+                'department': metrics['department'],
                 'skills': sorted(metrics['skills']),
-                'tracks': metrics['track_scores']
+                'projects': metrics['projects']
             }
             curr_hash = hashlib.md5(json.dumps(condensed, sort_keys=True).encode('utf-8')).hexdigest()
             
@@ -343,7 +224,7 @@ else:
     import argparse
     
     def main():
-        parser = argparse.ArgumentParser(description="Industry 6.0 Student Analytics Engine")
+        parser = argparse.ArgumentParser(description="Jeppiaar Shikshak Student Analytics Engine")
         parser.add_argument('--student', type=str, help='Select student Roll Number (e.g. 20JUCSE001)')
         parser.add_argument('--key', type=str, help='Gemini API key')
         args = parser.parse_args()
@@ -351,7 +232,7 @@ else:
         engine = StudentAnalyticsEngine()
         df = pd.DataFrame(MOCK_DATA)
 
-        print("\n=== Industry 6.0 Student Analytics CLI ===")
+        print("\n=== Jeppiaar Shikshak Student Analytics CLI ===")
         
         if not args.student:
             print("Roster profiles:")
@@ -365,15 +246,7 @@ else:
             print(f"\nProfile Results for {metrics['name']} ({metrics['student_id']})")
             print(f"Department: {metrics['department']}")
             print(f"Skills: {', '.join(metrics['skills'])}")
-            print("-" * 40)
-            print(f"Lead Talks Delivered: {metrics['lead_talks_delivered']} (Avg: {metrics['averages']['lead_talks']})")
-            print(f"Rubik's Cube Events: {metrics['rubiks_cube_events']} (Avg: {metrics['averages']['rubiks']})")
-            print(f"Outreach Visits: {metrics['outreach_visits']} (Avg: {metrics['averages']['outreach']})")
-            print(f"MASK OFF Attendance: {metrics['mask_off_attendance']} (Avg: {metrics['averages']['maskoff']})")
-            print("-" * 40)
-            print("Track Suitability Scores:")
-            for track, score in metrics['track_scores'].items():
-                print(f"  {track}: {score:.1f}/100")
+            print(f"Projects: {metrics['projects']}")
             print("-" * 40)
 
             print("Cache Check & AI Assessment...")

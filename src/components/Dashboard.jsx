@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Award, BookOpen, Heart, Users, ShieldAlert, UploadCloud, FileSpreadsheet, FileJson, Check, AlertCircle, Sparkles, BrainCircuit, X, RefreshCw, Bot, Send } from 'lucide-react';
+import { Award, BookOpen, Heart, Users, ShieldAlert, UploadCloud, FileSpreadsheet, FileJson, Check, AlertCircle, Sparkles, BrainCircuit, X, RefreshCw, Bot, Send, MessageSquare } from 'lucide-react';
 import { parseAndValidateCSV, parseAndValidateJSON, generateCSVSampleTemplate, getDeptFromRoll, getYearFromRoll } from '../utils/importer';
 import { getLLMConfig, queryLLM } from '../utils/llm';
+import { isValidDob, isValidRollNumber } from '../utils/studentPortal';
+import { saveMessage } from '../offline-storage/db';
+import { saveTemplate, getAllTemplates } from '../offline-storage/db';
 
 export default function Dashboard({ students, onSaveStudent, onSaveStudents, onDeleteStudent, onClearAllStudents }) {
   const [showAddForm, setShowAddForm] = useState(false);
@@ -146,11 +149,30 @@ export default function Dashboard({ students, onSaveStudent, onSaveStudents, onD
   // Form State
   const [rollNumber, setRollNumber] = useState('');
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [dob, setDob] = useState('');
   const [department, setDepartment] = useState('Computer Science');
-  const [leadTalks, setLeadTalks] = useState(0);
-  const [rubiksCube, setRubiksCube] = useState(0);
-  const [outreach, setOutreach] = useState(0);
-  const [maskOff, setMaskOff] = useState(0);
+  const [topSkills, setTopSkills] = useState('');
+  const [projects, setProjects] = useState('');
+  const [messageTitle, setMessageTitle] = useState('');
+  const [messageBody, setMessageBody] = useState('');
+  const [templateText, setTemplateText] = useState('');
+  const [templateSavedMsg, setTemplateSavedMsg] = useState('');
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const templates = await getAllTemplates();
+        if (templates && templates.length > 0) {
+          const latest = templates.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
+          setTemplateText((latest.sections || []).join('\n'));
+        }
+      } catch (e) {
+        console.warn('Failed to load templates', e);
+      }
+    };
+    load();
+  }, []);
 
   // Drag and drop handlers
   const handleDrag = (e) => {
@@ -242,10 +264,8 @@ export default function Dashboard({ students, onSaveStudent, onSaveStudents, onD
       'roll_number',
       'name',
       'department',
-      'lead_talks_delivered',
-      'rubiks_cube_events',
-      'outreach_visits_pups_manivakkam',
-      'mask_off_attendance'
+      'top_skills',
+      'projects'
     ];
     
     const customHeaders = new Set();
@@ -267,11 +287,9 @@ export default function Dashboard({ students, onSaveStudent, onSaveStudents, onD
       if (header === 'roll_number') return 'xxJUyyyzzz';
       if (header === 'name') return 'x';
       if (header === 'department') return 'y';
-      if (header === 'lead_talks_delivered') return '0';
-      if (header === 'rubiks_cube_events') return '0';
-      if (header === 'outreach_visits_pups_manivakkam') return '0';
-      if (header === 'mask_off_attendance') return '0';
-      return '0';
+      if (header === 'top_skills') return 'Python, SQL';
+      if (header === 'projects') return 'AI Chatbot';
+      return '';
     }).join(',');
     
     const csvContent = `${headerRow}\n${sampleRow}`;
@@ -300,11 +318,10 @@ export default function Dashboard({ students, onSaveStudent, onSaveStudents, onD
 
     try {
       const response = await queryLLM(
-        `Guru garu, I have loaded our active roster of ${students.length} student facilitators. Please analyze their leadership performance metrics and outreach distribution. Summarize:
-1. Active leadership density and averages.
-2. Top performers who excel in technical mastery and social outreach.
-3. Areas of opportunity or students who need a wellness conversation or encouragement.
-4. Suggested strategic activities for next month.
+        `Guru garu, I have loaded our active roster of ${students.length} student facilitators. Please analyze their technology skills and key projects. Summarize:
+1. Technical capabilities and skills distribution.
+2. Promising student projects and their applications.
+3. Suggested areas of study or technical encouragement.
 
 Respond strictly as Shishya, in a dedicated, respectful tone, and formatting everything beautifully.`,
         students,
@@ -363,9 +380,7 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
     });
   });
 
-  const hasStandardActivities = yearFilteredStudents.some(s => 
-    ['lead_talks_delivered', 'rubiks_cube_events', 'outreach_visits_pups_manivakkam', 'mask_off_attendance'].some(k => k in s)
-  );
+  const hasStandardActivities = false;
 
   const uniqueDepts = new Set(yearFilteredStudents.map(s => s.department).filter(Boolean)).size;
 
@@ -421,31 +436,14 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
         groups[dept] = {
           name: dept,
           count: 0,
-          totalActivities: 0,
-          hasStandard: false,
           students: []
         };
       }
       groups[dept].count++;
-      
-      const activitySum = (s.lead_talks_delivered || 0) + 
-                          (s.rubiks_cube_events || 0) + 
-                          (s.outreach_visits_pups_manivakkam || 0) + 
-                          (s.mask_off_attendance || 0);
-      
-      groups[dept].totalActivities += activitySum;
       groups[dept].students.push(s);
-      
-      const sHasStandard = ['lead_talks_delivered', 'rubiks_cube_events', 'outreach_visits_pups_manivakkam', 'mask_off_attendance'].some(k => k in s);
-      if (sHasStandard) {
-        groups[dept].hasStandard = true;
-      }
     });
 
-    return Object.values(groups).map(g => ({
-      ...g,
-      avgActivities: parseFloat((g.count > 0 ? g.totalActivities / g.count : 0).toFixed(1))
-    }));
+    return Object.values(groups);
   }, [calculatedStudents]);
 
   const totalCount = calculatedStudents.length;
@@ -477,7 +475,7 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
     };
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -493,28 +491,61 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
       return;
     }
 
+    if (!isValidRollNumber(upperRoll)) {
+      setErrorMsg('Roll number must follow the format aaJUbbbccc (example: 22JUCS001).');
+      return;
+    }
+
+    if (!isValidDob(dob)) {
+      setErrorMsg('Date of birth must be in DD-MM-YYYY format.');
+      return;
+    }
+
     // Prepare student object
     const derivedDept = getDeptFromRoll(upperRoll);
     const newStudent = {
       roll_number: upperRoll,
       name: name.trim(),
+      email: email.trim(),
+      dob: dob.trim(),
       department: derivedDept || department,
-      lead_talks_delivered: parseInt(leadTalks),
-      rubiks_cube_events: parseInt(rubiksCube),
-      outreach_visits_pups_manivakkam: parseInt(outreach),
-      mask_off_attendance: parseInt(maskOff)
+      top_skills: topSkills.trim(),
+      projects: projects.trim()
     };
 
-    onSaveStudent(newStudent);
+    await onSaveStudent(newStudent);
+
+    if (messageTitle.trim() || messageBody.trim()) {
+      await saveMessage({
+        roll_number: upperRoll,
+        title: messageTitle.trim() || 'Message from management',
+        body: messageBody.trim() || 'A new message has been shared for you.',
+        timestamp: Date.now(),
+        read: false
+      });
+    }
     
     // Reset Form
     setRollNumber('');
     setName('');
-    setLeadTalks(0);
-    setRubiksCube(0);
-    setOutreach(0);
-    setMaskOff(0);
+    setEmail('');
+    setDob('');
+    setTopSkills('');
+    setProjects('');
+    setMessageTitle('');
+    setMessageBody('');
     setShowAddForm(false);
+  };
+
+  const handleSaveTemplate = async () => {
+    const sections = templateText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    if (sections.length === 0) {
+      setTemplateSavedMsg('Please enter at least one section name.');
+      return;
+    }
+    await saveTemplate({ name: 'default', sections, timestamp: Date.now() });
+    setTemplateSavedMsg('Template saved');
+    setTimeout(() => setTemplateSavedMsg(''), 2500);
   };
 
   const getScoreClass = (score) => {
@@ -552,11 +583,19 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
               <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Roll Number</label>
-                  <input type="text" className="form-control" placeholder="e.g. xxJUyyyzzz" value={rollNumber} onChange={(e) => setRollNumber(e.target.value)} required />
+                  <input type="text" className="form-control" placeholder="e.g. 22JUCS001" value={rollNumber} onChange={(e) => setRollNumber(e.target.value)} required />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Full Name</label>
                   <input type="text" className="form-control" placeholder="e.g. Name (x)" value={name} onChange={(e) => setName(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email Address</label>
+                  <input type="email" className="form-control" placeholder="student@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Date of Birth</label>
+                  <input type="text" className="form-control" placeholder="DD-MM-YYYY" value={dob} onChange={(e) => setDob(e.target.value)} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Department</label>
@@ -566,6 +605,14 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
                     <option value="Electronics & Communication">Electronics & Communication</option>
                     <option value="Mechanical Engineering">Mechanical Engineering</option>
                   </select>
+                </div>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label">Optional Management Message</label>
+                  <input type="text" className="form-control" placeholder="Message title" value={messageTitle} onChange={(e) => setMessageTitle(e.target.value)} />
+                </div>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label">Message Details</label>
+                  <textarea className="form-control" placeholder="Share opportunities or instructions" value={messageBody} onChange={(e) => setMessageBody(e.target.value)} style={{ minHeight: '90px', resize: 'vertical' }} />
                 </div>
                 <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
                   <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Register Student & Initialize</button>
@@ -768,6 +815,18 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
             </select>
           )}
         </div>
+        <div style={{ width: '100%', marginTop: '12px' }}>
+          <div className="glass-card" style={{ padding: '16px', marginBottom: '16px' }}>
+            <h4 style={{ margin: '0 0 8px 0' }}>Profile Template (Management)</h4>
+            <p style={{ margin: '0 0 8px 0', color: 'var(--text-secondary)', fontSize: '13px' }}>Enter one section name per line (e.g. Skills, Projects, Education). Students will see these sections in their profile editor.</p>
+            <textarea value={templateText} onChange={(e) => setTemplateText(e.target.value)} style={{ width: '100%', minHeight: '80px', padding: '8px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+              <button className="btn btn-secondary" onClick={() => { setTemplateText(''); setTemplateSavedMsg(''); }}>Clear</button>
+              <button className="btn btn-primary" onClick={handleSaveTemplate}>Save Template</button>
+            </div>
+            {templateSavedMsg && (<div style={{ marginTop: '8px', color: 'var(--color-success)' }}>{templateSavedMsg}</div>)}
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           {students.length > 0 && (
             <button 
@@ -802,7 +861,7 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
             AI Roster Analysis
           </button>
           <button className="btn btn-secondary" onClick={() => { setShowImportForm(!showImportForm); setShowAddForm(false); }}>
-            {showImportForm ? 'Close Bulk Import' : 'Bulk Import (CSV/JSON)'}
+            {showImportForm ? 'Close Mass Upload' : 'Mass Upload Data (CSV/JSON/TXT)'}
           </button>
           <button className="btn btn-primary" onClick={() => { setShowAddForm(!showAddForm); setShowImportForm(false); }}>
             {showAddForm ? 'Close Registration' : 'Register New Student'}
@@ -815,10 +874,10 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
         <div className="glass-card" style={{ marginBottom: '32px', animation: 'fadeIn 0.3s ease' }}>
           <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <UploadCloud size={20} style={{ color: 'var(--color-primary)' }} />
-            Bulk Import Student Manifests
+            Mass Upload Student Data
           </h3>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-            Upload CSV or JSON files to register new student facilitators or bulk update existing activity metrics. 
+            Upload CSV, JSON, or TXT files to register new student facilitators or bulk update existing activity metrics. 
             Roll numbers present in the file will automatically update current records.
           </p>
 
@@ -844,17 +903,17 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
             <input 
               type="file" 
               id="bulk-file-input" 
-              accept=".csv,.json"
+              accept=".csv,.json,.txt"
               style={{ display: 'none' }}
               onChange={handleFileChange}
             />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
               <UploadCloud size={36} style={{ color: 'var(--text-muted)' }} />
               <div style={{ fontSize: '14px', fontWeight: '500' }}>
-                Drag and drop CSV/JSON file here, or <span style={{ color: 'var(--color-primary)' }}>browse</span>
+                Drag and drop CSV, JSON, or TXT data here, or <span style={{ color: 'var(--color-primary)' }}>browse</span>
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Supports standard SDC CSV headers or JSON array. Max 2MB.
+                Supports standard SDC CSV headers, JSON arrays, or plain text records. Max 2MB.
               </div>
             </div>
           </div>
@@ -915,11 +974,19 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
           <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
             <div className="form-group">
               <label className="form-label">Roll Number</label>
-              <input type="text" className="form-control" placeholder="e.g. xxJUyyyzzz" value={rollNumber} onChange={(e) => setRollNumber(e.target.value)} required />
+              <input type="text" className="form-control" placeholder="e.g. 22JUCS001" value={rollNumber} onChange={(e) => setRollNumber(e.target.value)} required />
             </div>
             <div className="form-group">
               <label className="form-label">Full Name</label>
               <input type="text" className="form-control" placeholder="e.g. Name (x)" value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Email Address</label>
+              <input type="email" className="form-control" placeholder="student@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Date of Birth</label>
+              <input type="text" className="form-control" placeholder="DD-MM-YYYY" value={dob} onChange={(e) => setDob(e.target.value)} />
             </div>
             <div className="form-group">
               <label className="form-label">Department</label>
@@ -931,20 +998,20 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Lead Talks Delivered</label>
-              <input type="number" min="0" className="form-control" value={leadTalks} onChange={(e) => setLeadTalks(e.target.value)} />
+              <label className="form-label">Top Skills</label>
+              <input type="text" className="form-control" placeholder="e.g. Python, SQL, React" value={topSkills} onChange={(e) => setTopSkills(e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label">Rubik's Cube Events</label>
-              <input type="number" min="0" className="form-control" value={rubiksCube} onChange={(e) => setRubiksCube(e.target.value)} />
+              <label className="form-label">Key Projects</label>
+              <input type="text" className="form-control" placeholder="e.g. AI Chatbot, Portfolio Site" value={projects} onChange={(e) => setProjects(e.target.value)} />
             </div>
-            <div className="form-group">
-              <label className="form-label">Outreach (PUPS Manivakkam)</label>
-              <input type="number" min="0" className="form-control" value={outreach} onChange={(e) => setOutreach(e.target.value)} />
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label">Optional Management Message</label>
+              <input type="text" className="form-control" placeholder="Message title" value={messageTitle} onChange={(e) => setMessageTitle(e.target.value)} />
             </div>
-            <div className="form-group">
-              <label className="form-label">MASK OFF Attendance</label>
-              <input type="number" min="0" className="form-control" value={maskOff} onChange={(e) => setMaskOff(e.target.value)} />
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label">Message Details</label>
+              <textarea className="form-control" placeholder="Share opportunities or instructions" value={messageBody} onChange={(e) => setMessageBody(e.target.value)} style={{ minHeight: '90px', resize: 'vertical' }} />
             </div>
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
               <button type="button" className="btn btn-secondary" onClick={() => setShowAddForm(false)}>Cancel</button>
@@ -1005,40 +1072,7 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
                 </div>
               </div>
 
-              {/* Bar Chart */}
-              <div className="glass-card" style={{ padding: '24px' }}>
-                <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text-secondary)' }}>Average Activities per Student</h4>
-                {departmentStats.length === 0 ? (
-                  <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '40px 0' }}>No stats available</div>
-                ) : (
-                  <svg width="100%" height={Math.max(120, departmentStats.length * 30)} style={{ overflow: 'visible' }}>
-                    <defs>
-                      <linearGradient id="barGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="var(--color-primary)" />
-                        <stop offset="100%" stopColor="var(--color-secondary)" />
-                      </linearGradient>
-                    </defs>
-                    {departmentStats.map((dept, idx) => {
-                      const y = idx * 30 + 10;
-                      // Assume max activities in average scale is 20 for full visual width
-                      const scalePercent = Math.min(100, ((dept.avgActivities || 0) / 20) * 100);
-                      const barWidth = `${scalePercent * 0.6}%`;
-                      return (
-                        <g key={idx}>
-                          <text x="0" y={y + 12} fill="var(--text-secondary)" fontSize="11" fontWeight="500">
-                            {dept.name.length > 18 ? dept.name.slice(0, 16) + '...' : dept.name}
-                          </text>
-                          <rect x="110" y={y + 4} width="60%" height="8" rx="4" fill="rgba(255,255,255,0.03)" />
-                          <rect x="110" y={y + 4} width={barWidth} height="8" rx="4" fill="url(#barGrad)" />
-                          <text x="88%" y={y + 12} fill="var(--color-primary)" fontSize="12" fontWeight="600">
-                            {dept.avgActivities || 0}
-                          </text>
-                        </g>
-                      );
-                    })}
-                  </svg>
-                )}
-              </div>
+
 
               {/* Batch Distribution Card */}
               <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -1098,12 +1132,7 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
                       <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block' }}>Facilitators</span>
                       <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-primary)' }}>{dept.count}</span>
                     </div>
-                    {dept.hasStandard && (
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block' }}>Avg Activities</span>
-                        <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-secondary)' }}>{dept.avgActivities}</span>
-                      </div>
-                    )}
+
                   </div>
                 </div>
               ))
@@ -1178,10 +1207,8 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
                   <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}>
                     <th style={{ padding: '12px 8px', fontWeight: '600' }}>Roll Number</th>
                     <th style={{ padding: '12px 8px', fontWeight: '600' }}>Name</th>
-                    <th style={{ padding: '12px 8px', fontWeight: '600' }}>Lead Talks</th>
-                    <th style={{ padding: '12px 8px', fontWeight: '600' }}>Rubik's Cube</th>
-                    <th style={{ padding: '12px 8px', fontWeight: '600' }}>Outreach</th>
-                    <th style={{ padding: '12px 8px', fontWeight: '600' }}>MASK OFF</th>
+                    <th style={{ padding: '12px 8px', fontWeight: '600' }}>Skills</th>
+                    <th style={{ padding: '12px 8px', fontWeight: '600' }}>Projects</th>
                     <th style={{ padding: '12px 8px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
@@ -1212,10 +1239,8 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
                           >
                             <td style={{ padding: '14px 8px', fontWeight: '600', fontFamily: 'monospace', color: 'var(--color-primary)' }}>{student.roll_number}</td>
                             <td style={{ padding: '14px 8px', fontWeight: '500' }}>{student.name}</td>
-                            <td style={{ padding: '14px 8px' }}>{student.lead_talks_delivered || 0}</td>
-                            <td style={{ padding: '14px 8px' }}>{student.rubiks_cube_events || 0}</td>
-                            <td style={{ padding: '14px 8px' }}>{student.outreach_visits_pups_manivakkam || 0}</td>
-                            <td style={{ padding: '14px 8px' }}>{student.mask_off_attendance || 0}</td>
+                            <td style={{ padding: '14px 8px' }}>{student.top_skills || student.skills || ''}</td>
+                            <td style={{ padding: '14px 8px' }}>{student.projects || ''}</td>
                             <td style={{ padding: '14px 8px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                                 <button 
@@ -1257,28 +1282,10 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
             return null;
           }
 
-          const studentHasStandard = ['lead_talks_delivered', 'rubiks_cube_events', 'outreach_visits_pups_manivakkam', 'mask_off_attendance'].some(k => k in student);
+          const studentHasStandard = false;
           const presentKeys = Object.keys(student).filter(k => 
             k !== 'roll_number' && k !== 'name' && k !== 'department' && k !== 'metrics' && k !== 'leadership_score' && k !== 'wellness_score'
           );
-
-          // Calculate department averages for comparison
-          const deptStudents = calculatedStudents.filter(s => (s.department || 'No Department') === selectedDepartment);
-          const avgStats = { leadTalks: 0, rubiks: 0, outreach: 0, maskOff: 0 };
-          if (deptStudents.length > 0) {
-            deptStudents.forEach(s => {
-              avgStats.leadTalks += s.lead_talks_delivered || 0;
-              avgStats.rubiks += s.rubiks_cube_events || 0;
-              avgStats.outreach += s.outreach_visits_pups_manivakkam || 0;
-              avgStats.maskOff += s.mask_off_attendance || 0;
-            });
-            avgStats.leadTalks = +(avgStats.leadTalks / deptStudents.length).toFixed(1);
-            avgStats.rubiks = +(avgStats.rubiks / deptStudents.length).toFixed(1);
-            avgStats.outreach = +(avgStats.outreach / deptStudents.length).toFixed(1);
-            avgStats.maskOff = +(avgStats.maskOff / deptStudents.length).toFixed(1);
-          }
-
-          const studentActivitySum = (student.lead_talks_delivered || 0) + (student.rubiks_cube_events || 0) + (student.outreach_visits_pups_manivakkam || 0) + (student.mask_off_attendance || 0);
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1313,10 +1320,8 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {presentKeys.map(k => {
                         const labels = {
-                          lead_talks_delivered: 'Lead Talks Delivered',
-                          rubiks_cube_events: "Rubik's Cube Events",
-                          outreach_visits_pups_manivakkam: 'Outreach Visits (PUPS)',
-                          mask_off_attendance: 'MASK OFF Attendance'
+                          top_skills: 'Top Skills',
+                          projects: 'Key Projects'
                         };
                         const label = labels[k] || k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                         const value = student[k];
@@ -1364,87 +1369,10 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
                     </div>
                   </div>
 
-                  {/* SDC Sub-scores List - Replaced with Activity Summary */}
-                  {studentHasStandard && (
-                    <div className="glass-card" style={{ padding: '16px' }}>
-                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>Activity Summary</span>
-                      <div className="metric-row" style={{ fontSize: '13px', marginBottom: '6px' }}>
-                        <span>Lead Talks Delivered</span>
-                        <span style={{ fontWeight: '600' }}>{student.lead_talks_delivered || 0}</span>
-                      </div>
-                      <div className="metric-row" style={{ fontSize: '13px', marginBottom: '6px' }}>
-                        <span>Rubik's Cube Events</span>
-                        <span style={{ fontWeight: '600' }}>{student.rubiks_cube_events || 0}</span>
-                      </div>
-                      <div className="metric-row" style={{ fontSize: '13px', marginBottom: '6px' }}>
-                        <span>Outreach Visits (PUPS)</span>
-                        <span style={{ fontWeight: '600' }}>{student.outreach_visits_pups_manivakkam || 0}</span>
-                      </div>
-                      <div className="metric-row" style={{ fontSize: '13px' }}>
-                        <span>MASK OFF Attendance</span>
-                        <span style={{ fontWeight: '600' }}>{student.mask_off_attendance || 0}</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Right Side: Charts & Discussion Panel */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {/* SDC Visualizations - Activity Performance Comparison */}
-                  {studentHasStandard && (
-                    <div className="glass-card" style={{ padding: '20px' }}>
-                      <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text-secondary)' }}>Activity Performance Comparison</h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {/* Talks comparison */}
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px' }}>
-                            <span style={{ fontWeight: '500' }}>Lead Talks Delivered</span>
-                            <span><strong style={{ color: 'var(--color-primary)' }}>{student.lead_talks_delivered || 0}</strong> vs Dept Avg: {avgStats.leadTalks}</span>
-                          </div>
-                          <div style={{ height: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', position: 'relative', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', background: 'var(--color-secondary)', width: `${Math.min(100, (avgStats.leadTalks / Math.max(1, student.lead_talks_delivered || 0, avgStats.leadTalks)) * 100)}%`, opacity: 0.3, position: 'absolute', top: 0, left: 0 }} />
-                            <div style={{ height: '100%', background: 'var(--color-primary)', width: `${Math.min(100, ((student.lead_talks_delivered || 0) / Math.max(1, student.lead_talks_delivered || 0, avgStats.leadTalks)) * 100)}%`, position: 'absolute', top: 0, left: 0 }} />
-                          </div>
-                        </div>
-
-                        {/* Rubiks comparison */}
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px' }}>
-                            <span style={{ fontWeight: '500' }}>Rubik's Cube Events</span>
-                            <span><strong style={{ color: 'var(--color-primary)' }}>{student.rubiks_cube_events || 0}</strong> vs Dept Avg: {avgStats.rubiks}</span>
-                          </div>
-                          <div style={{ height: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', position: 'relative', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', background: 'var(--color-secondary)', width: `${Math.min(100, (avgStats.rubiks / Math.max(1, student.rubiks_cube_events || 0, avgStats.rubiks)) * 100)}%`, opacity: 0.3, position: 'absolute', top: 0, left: 0 }} />
-                            <div style={{ height: '100%', background: 'var(--color-primary)', width: `${Math.min(100, ((student.rubiks_cube_events || 0) / Math.max(1, student.rubiks_cube_events || 0, avgStats.rubiks)) * 100)}%`, position: 'absolute', top: 0, left: 0 }} />
-                          </div>
-                        </div>
-
-                        {/* Outreach comparison */}
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px' }}>
-                            <span style={{ fontWeight: '500' }}>Outreach Visits (PUPS)</span>
-                            <span><strong style={{ color: 'var(--color-primary)' }}>{student.outreach_visits_pups_manivakkam || 0}</strong> vs Dept Avg: {avgStats.outreach}</span>
-                          </div>
-                          <div style={{ height: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', position: 'relative', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', background: 'var(--color-secondary)', width: `${Math.min(100, (avgStats.outreach / Math.max(1, student.outreach_visits_pups_manivakkam || 0, avgStats.outreach)) * 100)}%`, opacity: 0.3, position: 'absolute', top: 0, left: 0 }} />
-                            <div style={{ height: '100%', background: 'var(--color-primary)', width: `${Math.min(100, ((student.outreach_visits_pups_manivakkam || 0) / Math.max(1, student.outreach_visits_pups_manivakkam || 0, avgStats.outreach)) * 100)}%`, position: 'absolute', top: 0, left: 0 }} />
-                          </div>
-                        </div>
-
-                        {/* Mask Off comparison */}
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px' }}>
-                            <span style={{ fontWeight: '500' }}>MASK OFF Attendance</span>
-                            <span><strong style={{ color: 'var(--color-primary)' }}>{student.mask_off_attendance || 0}</strong> vs Dept Avg: {avgStats.maskOff}</span>
-                          </div>
-                          <div style={{ height: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', position: 'relative', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', background: 'var(--color-secondary)', width: `${Math.min(100, (avgStats.maskOff / Math.max(1, student.mask_off_attendance || 0, avgStats.maskOff)) * 100)}%`, opacity: 0.3, position: 'absolute', top: 0, left: 0 }} />
-                            <div style={{ height: '100%', background: 'var(--color-primary)', width: `${Math.min(100, ((student.mask_off_attendance || 0) / Math.max(1, student.mask_off_attendance || 0, avgStats.maskOff)) * 100)}%`, position: 'absolute', top: 0, left: 0 }} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Contextual Chat Agent */}
                   <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '16px', height: '320px' }}>

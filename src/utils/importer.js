@@ -68,23 +68,10 @@ const HEADER_MAPPING = {
   'full_name': 'name',
   'dept': 'department',
   'department': 'department',
-  'leadtalks': 'lead_talks_delivered',
-  'lead_talks': 'lead_talks_delivered',
-  'leadtalksdelivered': 'lead_talks_delivered',
-  'lead_talks_delivered': 'lead_talks_delivered',
-  'rubiks': 'rubiks_cube_events',
-  'rubikscube': 'rubiks_cube_events',
-  'rubiks_cube_events': 'rubiks_cube_events',
-  'rubiks_events': 'rubiks_cube_events',
-  'outreach': 'outreach_visits_pups_manivakkam',
-  'outreach_visits': 'outreach_visits_pups_manivakkam',
-  'outreachvisits': 'outreach_visits_pups_manivakkam',
-  'pups_outreach': 'outreach_visits_pups_manivakkam',
-  'outreach_visits_pups_manivakkam': 'outreach_visits_pups_manivakkam',
-  'maskoff': 'mask_off_attendance',
-  'mask_off': 'mask_off_attendance',
-  'maskoffattendance': 'mask_off_attendance',
-  'mask_off_attendance': 'mask_off_attendance'
+  'skills': 'top_skills',
+  'top_skills': 'top_skills',
+  'topskills': 'top_skills',
+  'projects': 'projects'
 };
 
 function parseCSVLine(line) {
@@ -205,6 +192,10 @@ export function parseAndValidateJSON(jsonText) {
         mappedKey = 'name';
       } else if (clean.includes('dept') || clean.includes('bran') || clean.includes('special')) {
         mappedKey = 'department';
+      } else if (clean.includes('skill')) {
+        mappedKey = 'top_skills';
+      } else if (clean.includes('project')) {
+        mappedKey = 'projects';
       } else {
         mappedKey = key.trim();
       }
@@ -281,38 +272,14 @@ function validateStudentField(record, rowIdentifier) {
     validatedRecord.department = dept;
   }
 
-  // 4. Activity stats & Wellness
-  const parseNum = (val, defaultValue = 0) => {
-    if (val === undefined || val === null || val === '') return defaultValue;
-    const parsed = parseInt(val, 10);
-    return isNaN(parsed) ? -1 : parsed;
-  };
-
-  let validationError = null;
-
+  // 4. Custom and profile fields
   Object.keys(record).forEach(key => {
     if (key === 'roll_number' || key === 'name' || key === 'department') return;
 
     const value = record[key];
-
-    // If it's one of the standard numeric fields, validate it
-    if (key === 'lead_talks_delivered' || key === 'rubiks_cube_events' || 
-        key === 'outreach_visits_pups_manivakkam' || key === 'mask_off_attendance') {
-      const parsedVal = parseNum(value, 0);
-      if (parsedVal < 0) {
-        validationError = `${key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} must be a non-negative integer.`;
-      }
-      validatedRecord[key] = parsedVal;
-    } else {
-      // Keep custom fields exactly as strings or parsed numbers
-      const parsedVal = parseInt(value, 10);
-      validatedRecord[key] = isNaN(parsedVal) ? value : parsedVal;
-    }
+    const parsedVal = parseInt(value, 10);
+    validatedRecord[key] = isNaN(parsedVal) ? value : parsedVal;
   });
-
-  if (validationError) {
-    return { valid: false, message: validationError };
-  }
 
   return {
     valid: true,
@@ -325,13 +292,11 @@ export function generateCSVSampleTemplate() {
     'roll_number',
     'name',
     'department',
-    'lead_talks_delivered',
-    'rubiks_cube_events',
-    'outreach_visits_pups_manivakkam',
-    'mask_off_attendance'
+    'top_skills',
+    'projects'
   ].join(',');
-  const sampleRow1 = 'xxJUyyyzzz,x,y,0,0,0,0';
-  const sampleRow2 = 'xxJUyyyzzz,x,y,0,0,0,0';
+  const sampleRow1 = 'xxJUyyyzzz,Arjun Sharma,Computer Science,Python, SQL,AI Chatbot';
+  const sampleRow2 = 'xxJUyyyzzz,Bhavana Reddy,Computer Science,Java, HTML,CSS,Portfolio Site';
   return `${headers}\n${sampleRow1}\n${sampleRow2}`;
 }
 

@@ -26,11 +26,15 @@ import Settings from './components/Settings';
 import GroupsTracker from './components/GroupsTracker';
 import FloatingChat from './components/FloatingChat';
 import CVAnalyzer from './components/CVAnalyzer';
-import { LayoutDashboard, Globe, MessageSquare, RefreshCcw, Settings as SettingsIcon, Wifi, WifiOff, Users, BrainCircuit } from 'lucide-react';
+import LandingScreen from './components/LandingScreen';
+import StudentPortal from './components/student/StudentProfile';
+import { LayoutDashboard, Globe, MessageSquare, RefreshCcw, Settings as SettingsIcon, Wifi, WifiOff, Users, BrainCircuit, ArrowLeft } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [view, setView] = useState('landing');
   const [students, setStudents] = useState([]);
+  const [currentStudent, setCurrentStudent] = useState(null);
   const [outreachList, setOutreachList] = useState([]);
   const [groupsList, setGroupsList] = useState([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -337,6 +341,33 @@ export default function App() {
     }
   };
 
+  const handleManagementLogin = () => {
+    setView('management');
+    setActiveTab('dashboard');
+  };
+
+  const handleStudentLogin = (student) => {
+    setCurrentStudent(student);
+    setView('student');
+  };
+
+  const handleStudentUpdate = (updatedStudent) => {
+    setCurrentStudent(updatedStudent);
+  };
+
+  const handleLogout = () => {
+    setCurrentStudent(null);
+    setView('landing');
+  };
+
+  if (view === 'landing') {
+    return <LandingScreen onManagementLogin={handleManagementLogin} onStudentLogin={handleStudentLogin} />;
+  }
+
+  if (view === 'student' && currentStudent) {
+    return <StudentPortal student={currentStudent} onStudentUpdate={handleStudentUpdate} onLogout={handleLogout} />;
+  }
+
   return (
     <div className="app-container">
       {/* Decorative Glow Elements */}
@@ -348,9 +379,27 @@ export default function App() {
         <div className="brand">
           <span className="brand-logo">Jeppiaar Shikshak CV Analyzer</span>
         </div>
-        <div className={`network-badge ${isOnline ? 'online' : 'offline'}`}>
-          {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
-          {isOnline ? 'Online mode' : 'Offline mode'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 12px',
+              borderRadius: '999px',
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.04)',
+              color: '#e2e8f0',
+              cursor: 'pointer'
+            }}
+          >
+            <ArrowLeft size={14} /> Back to Home
+          </button>
+          <div className={`network-badge ${isOnline ? 'online' : 'offline'}`}>
+            {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+            {isOnline ? 'Online mode' : 'Offline mode'}
+          </div>
         </div>
       </header>
 
