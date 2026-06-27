@@ -172,7 +172,7 @@ export async function callGemini(apiKey, endpoint, model, systemInstruction, pro
         parts: [{ text: prompt }]
       }
     ],
-    systemInstruction: {
+    system_instruction: {
       parts: [{ text: systemInstruction }]
     },
     generationConfig: {
