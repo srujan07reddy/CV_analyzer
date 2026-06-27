@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getLLMConfig, saveLLMConfig, queryLLM, callGemini } from '../utils/llm';
+import { getLLMConfig, saveLLMConfig, queryLLM, callGemini, callGroq, callOpenRouter } from '../utils/llm';
 import { ShieldCheck, ShieldAlert, Cpu, Play, RefreshCw, Key, HelpCircle, UserCheck, Users, Trash2, Edit2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
@@ -126,7 +126,10 @@ export default function Settings() {
   useEffect(() => {
     const loaded = getLLMConfig();
     setConfig({
-      apiKey: loaded.apiKey,
+      provider: loaded.provider || 'gemini',
+      apiKey: loaded.apiKey || '',
+      groqApiKey: loaded.groqApiKey || '',
+      openrouterApiKey: loaded.openrouterApiKey || '',
       enabled: loaded.enabled
     });
   }, []);
@@ -143,14 +146,33 @@ export default function Settings() {
 
     try {
       const currentConfig = getLLMConfig();
-      // Call Gemini directly with the typed API Key, bypassing config.enabled check
-      const response = await callGemini(
-        config.apiKey,
-        currentConfig.endpoint,
-        currentConfig.model,
-        currentConfig.systemPrompt,
-        'Diagnose system connectivity. Respond with "Connection successful, Guru!" if you can see this message.'
-      );
+      let response = '';
+      if (config.provider === 'groq') {
+        if (!config.groqApiKey) throw new Error('Groq API Key is empty.');
+        response = await callGroq(
+          config.groqApiKey,
+          'llama-3.1-8b-instant',
+          'You are a diagnostics assistant.',
+          'Respond with "Connection successful, Guru!"'
+        );
+      } else if (config.provider === 'openrouter') {
+        if (!config.openrouterApiKey) throw new Error('OpenRouter API Key is empty.');
+        response = await callOpenRouter(
+          config.openrouterApiKey,
+          'meta-llama/llama-3-8b-instruct:free',
+          'You are a diagnostics assistant.',
+          'Respond with "Connection successful, Guru!"'
+        );
+      } else {
+        if (!config.apiKey) throw new Error('Gemini API Key is empty.');
+        response = await callGemini(
+          config.apiKey,
+          currentConfig.endpoint,
+          currentConfig.model,
+          currentConfig.systemPrompt,
+          'Diagnose system connectivity. Respond with "Connection successful, Guru!" if you can see this message.'
+        );
+      }
       setTestStatus('success');
       setTestResult(response);
     } catch (err) {
@@ -167,7 +189,7 @@ export default function Settings() {
           Gemini AI Integration Settings
         </h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '20px' }}>
-          Guru garu, configure your Gemini API key below. This connects Shishya to Google's reasoning engines to run advanced student analytics reports and natural language chat interfaces.
+          Guru garu, configure your AI reasoning providers. This connects Shishya to Google, Groq, or OpenRouter models to run student analytics and chat interfaces.
         </p>
 
         {/* Enabled Checkbox Switch */}
@@ -181,47 +203,137 @@ export default function Settings() {
               onChange={(e) => handleChange('enabled', e.target.checked)}
               style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }}
             />
-            <span style={{ fontWeight: '600', fontSize: '15px' }}>Enable Gemini AI Capabilities</span>
+            <span style={{ fontWeight: '600', fontSize: '15px' }}>Enable AI Capabilities</span>
           </label>
         </div>
 
         {config.enabled && (
           <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: '1fr', gap: '20px', animation: 'fadeIn 0.3s ease' }}>
-            
-            {/* API Key */}
+            {/* Provider Selector */}
             <div className="form-group">
-              <label htmlFor="gemini-api-key" className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Gemini API Key</span>
-                <span 
-                  style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px' }}
-                  onClick={() => setShowKey(!showKey)}
-                >
-                  {showKey ? 'Hide Key' : 'Reveal Key'}
-                </span>
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input 
-                  id="gemini-api-key"
-                  name="gemini-api-key"
-                  type={showKey ? 'text' : 'password'} 
-                  className="form-control" 
-                  placeholder="AIzaSy..."
-                  value={config.apiKey}
-                  onChange={(e) => handleChange('apiKey', e.target.value)}
-                  style={{ paddingRight: '40px' }}
-                />
-                <Key size={16} style={{ position: 'absolute', right: '12px', top: '12px', color: 'var(--text-muted)' }} />
-              </div>
+              <label htmlFor="ai-provider-select" className="form-label">Select Active AI Provider</label>
+              <select
+                id="ai-provider-select"
+                name="ai-provider-select"
+                className="form-control"
+                value={config.provider || 'gemini'}
+                onChange={(e) => handleChange('provider', e.target.value)}
+                style={{ background: '#0f172a', color: '#fff', cursor: 'pointer' }}
+              >
+                <option value="gemini">Google Gemini (Recommended - Free Tier)</option>
+                <option value="groq">Groq (Ultra-fast - Llama 3.1 Free Tier)</option>
+                <option value="openrouter">OpenRouter (Aggregated Free Models)</option>
+              </select>
             </div>
+
+            {/* Gemini Key Input */}
+            {config.provider === 'gemini' && (
+              <div className="form-group" style={{ animation: 'fadeIn 0.2s' }}>
+                <label htmlFor="gemini-api-key" className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Gemini API Key</span>
+                  <span 
+                    style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px' }}
+                    onClick={() => setShowKey(!showKey)}
+                  >
+                    {showKey ? 'Hide Key' : 'Reveal Key'}
+                  </span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    id="gemini-api-key"
+                    name="gemini-api-key"
+                    type={showKey ? 'text' : 'password'} 
+                    className="form-control" 
+                    placeholder="AIzaSy..."
+                    value={config.apiKey || ''}
+                    onChange={(e) => handleChange('apiKey', e.target.value)}
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <Key size={16} style={{ position: 'absolute', right: '12px', top: '12px', color: 'var(--text-muted)' }} />
+                </div>
+              </div>
+            )}
+
+            {/* Groq Key Input */}
+            {config.provider === 'groq' && (
+              <div className="form-group" style={{ animation: 'fadeIn 0.2s' }}>
+                <label htmlFor="groq-api-key" className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Groq API Key</span>
+                  <span 
+                    style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px' }}
+                    onClick={() => setShowKey(!showKey)}
+                  >
+                    {showKey ? 'Hide Key' : 'Reveal Key'}
+                  </span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    id="groq-api-key"
+                    name="groq-api-key"
+                    type={showKey ? 'text' : 'password'} 
+                    className="form-control" 
+                    placeholder="gsk_..."
+                    value={config.groqApiKey || ''}
+                    onChange={(e) => handleChange('groqApiKey', e.target.value)}
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <Key size={16} style={{ position: 'absolute', right: '12px', top: '12px', color: 'var(--text-muted)' }} />
+                </div>
+              </div>
+            )}
+
+            {/* OpenRouter Key Input */}
+            {config.provider === 'openrouter' && (
+              <div className="form-group" style={{ animation: 'fadeIn 0.2s' }}>
+                <label htmlFor="openrouter-api-key" className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>OpenRouter API Key</span>
+                  <span 
+                    style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px' }}
+                    onClick={() => setShowKey(!showKey)}
+                  >
+                    {showKey ? 'Hide Key' : 'Reveal Key'}
+                  </span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    id="openrouter-api-key"
+                    name="openrouter-api-key"
+                    type={showKey ? 'text' : 'password'} 
+                    className="form-control" 
+                    placeholder="sk-or-..."
+                    value={config.openrouterApiKey || ''}
+                    onChange={(e) => handleChange('openrouterApiKey', e.target.value)}
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <Key size={16} style={{ position: 'absolute', right: '12px', top: '12px', color: 'var(--text-muted)' }} />
+                </div>
+              </div>
+            )}
 
             {/* Integration Tips */}
             <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '13px' }}>
               <strong style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-warning)', marginBottom: '8px' }}>
                 <HelpCircle size={14} /> Integration Instructions
               </strong>
-              <ul style={{ marginLeft: '16px', listStyleType: 'disc', color: 'var(--text-secondary)' }}>
-                <li>Get a Gemini API Key from Google AI Studio.</li>
-                <li>API calls are performed client-side safely from your browser.</li>
+              <ul style={{ marginLeft: '16px', listStyleType: 'disc', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {config.provider === 'gemini' && (
+                  <>
+                    <li>Get a Gemini API Key from Google AI Studio.</li>
+                    <li>API calls are performed client-side safely from your browser.</li>
+                  </>
+                )}
+                {config.provider === 'groq' && (
+                  <>
+                    <li>Create an account and obtain a free API key from the Groq console.</li>
+                    <li>Uses the ultra-fast <code>llama-3.1-8b-instant</code> model.</li>
+                  </>
+                )}
+                {config.provider === 'openrouter' && (
+                  <>
+                    <li>Get a free account API key from OpenRouter.ai.</li>
+                    <li>Queries the aggregated free <code>meta-llama/llama-3-8b-instruct:free</code> endpoint.</li>
+                  </>
+                )}
               </ul>
             </div>
 

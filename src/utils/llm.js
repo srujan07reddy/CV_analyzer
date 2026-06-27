@@ -15,7 +15,10 @@ export function getLLMConfig() {
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
+        provider: parsed.provider || 'gemini',
         apiKey: parsed.apiKey || '',
+        groqApiKey: parsed.groqApiKey || '',
+        openrouterApiKey: parsed.openrouterApiKey || '',
         endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
         model: 'gemini-1.5-flash',
         systemPrompt: DEFAULT_SYSTEM_PROMPT,
@@ -26,7 +29,10 @@ export function getLLMConfig() {
     console.error('Failed to parse LLM settings:', err);
   }
   return {
+    provider: 'gemini',
     apiKey: '',
+    groqApiKey: '',
+    openrouterApiKey: '',
     endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
     model: 'gemini-1.5-flash',
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
@@ -37,7 +43,10 @@ export function getLLMConfig() {
 export function saveLLMConfig(config) {
   const email = localStorage.getItem('sdc_logged_in_email') || 'global';
   localStorage.setItem(`sdc_llm_settings_${email}`, JSON.stringify({
+    provider: config.provider || 'gemini',
     apiKey: config.apiKey || '',
+    groqApiKey: config.groqApiKey || '',
+    openrouterApiKey: config.openrouterApiKey || '',
     enabled: !!config.enabled
   }));
 }
@@ -96,31 +105,32 @@ const CV_RESPONSE_SCHEMA = {
 };
 
 /**
- * Parse a student's resume using the Gemini LLM with structured output mapping.
+ * Parse a student's resume using the selected LLM provider with structured output mapping.
  */
 export async function parseResumeWithAI(cvText, rollHint = '') {
   const config = getLLMConfig();
-  if (!config.enabled || !config.apiKey) {
+  if (!config.enabled) {
     throw new Error('LLM integration is disabled or not configured.');
   }
 
-  const systemInstructions = "You are a precise resume parsing agent. Extract and structure the candidate details exactly matching the requested JSON schema constraints.";
+  const systemInstructions = "You are a precise resume parsing agent. Extract and structure the candidate details exactly matching the requested JSON schema constraints. Respond with strict JSON ONLY.";
   const userPrompt = CV_PARSER_PROMPT(cvText, rollHint);
 
-  const rawResponse = await callGemini(
-    config.apiKey,
-    config.endpoint,
-    config.model,
-    systemInstructions,
-    userPrompt,
-    CV_RESPONSE_SCHEMA
-  );
+  let rawResponse = '';
+  if (config.provider === 'groq') {
+    rawResponse = await callGroq(config.groqApiKey, 'llama-3.1-8b-instant', systemInstructions, userPrompt, CV_RESPONSE_SCHEMA);
+  } else if (config.provider === 'openrouter') {
+    rawResponse = await callOpenRouter(config.openrouterApiKey, 'meta-llama/llama-3-8b-instruct:free', systemInstructions, userPrompt, CV_RESPONSE_SCHEMA);
+  } else {
+    rawResponse = await callGemini(config.apiKey, config.endpoint, config.model, systemInstructions, userPrompt, CV_RESPONSE_SCHEMA);
+  }
 
   try {
     if (!rawResponse || !rawResponse.trim()) {
-      throw new Error("Received an empty response from Gemini API.");
+      throw new Error("Received an empty response from LLM API.");
     }
-    return JSON.parse(rawResponse.trim());
+    const cleanJson = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanJson);
   } catch (err) {
     console.error("AI JSON parsing failed. Raw response was:", rawResponse, err);
     throw new Error(`Failed to structure resume: ${err.message}`);
@@ -128,7 +138,7 @@ export async function parseResumeWithAI(cvText, rollHint = '') {
 }
 
 /**
- * Dispatches a prompt to the Gemini API
+ * Dispatches a prompt to the configured LLM API provider
  */
 export async function queryLLM(userPrompt, studentsList = []) {
   const config = getLLMConfig();
@@ -138,7 +148,13 @@ export async function queryLLM(userPrompt, studentsList = []) {
 
   const systemInstructions = `${config.systemPrompt}\n\n${buildDataContextPrompt(studentsList)}`;
 
-  return callGemini(config.apiKey, config.endpoint, config.model, systemInstructions, userPrompt);
+  if (config.provider === 'groq') {
+    return callGroq(config.groqApiKey, 'llama-3.1-8b-instant', systemInstructions, userPrompt);
+  } else if (config.provider === 'openrouter') {
+    return callOpenRouter(config.openrouterApiKey, 'meta-llama/llama-3-8b-instruct:free', systemInstructions, userPrompt);
+  } else {
+    return callGemini(config.apiKey, config.endpoint, config.model, systemInstructions, userPrompt);
+  }
 }
 
 export async function callGemini(apiKey, endpoint, model, systemInstruction, prompt, responseSchema = null) {
@@ -148,22 +164,16 @@ export async function callGemini(apiKey, endpoint, model, systemInstruction, pro
   
   const modelName = model || 'gemini-1.5-flash';
   const baseUrl = endpoint || 'https://generativelanguage.googleapis.com/v1beta/models';
-  
-  // Format target URL
   const url = `${baseUrl}/${modelName}:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [
       {
-        parts: [
-          { text: prompt }
-        ]
+        parts: [{ text: prompt }]
       }
     ],
     systemInstruction: {
-      parts: [
-        { text: systemInstruction }
-      ]
+      parts: [{ text: systemInstruction }]
     },
     generationConfig: {
       temperature: responseSchema ? 0.1 : 0.2,
@@ -175,28 +185,99 @@ export async function callGemini(apiKey, endpoint, model, systemInstruction, pro
     }
   };
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      const errorMsg = errData.error?.message || response.statusText;
-      throw new Error(`Gemini API Error: ${errorMsg}`);
-    }
-
-    const data = await response.json();
-    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]) {
-      return data.candidates[0].content.parts[0].text;
-    }
-    throw new Error('Empty response payload from Gemini API.');
-  } catch (err) {
-    console.error('Gemini API call failed:', err);
-    throw err;
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    const errorMsg = errData.error?.message || response.statusText;
+    throw new Error(`Gemini API Error: ${errorMsg}`);
   }
+
+  const data = await response.json();
+  if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]) {
+    return data.candidates[0].content.parts[0].text;
+  }
+  throw new Error('Empty response payload from Gemini API.');
+}
+
+export async function callGroq(apiKey, model, systemInstruction, prompt, responseSchema = null) {
+  if (!apiKey) {
+    throw new Error('Groq API Key is missing. Please configure it in Settings.');
+  }
+
+  const url = 'https://api.groq.com/openai/v1/chat/completions';
+  const payload = {
+    model: model || 'llama-3.1-8b-instant',
+    messages: [
+      { role: 'system', content: systemInstruction },
+      { role: 'user', content: prompt }
+    ],
+    temperature: responseSchema ? 0.1 : 0.2,
+    ...(responseSchema ? { response_format: { type: 'json_object' } } : {})
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    const errorMsg = errData.error?.message || response.statusText;
+    throw new Error(`Groq API Error: ${errorMsg}`);
+  }
+
+  const data = await response.json();
+  if (data.choices && data.choices[0] && data.choices[0].message) {
+    return data.choices[0].message.content;
+  }
+  throw new Error('Empty response payload from Groq API.');
+}
+
+export async function callOpenRouter(apiKey, model, systemInstruction, prompt, responseSchema = null) {
+  if (!apiKey) {
+    throw new Error('OpenRouter API Key is missing. Please configure it in Settings.');
+  }
+
+  const url = 'https://openrouter.ai/api/v1/chat/completions';
+  const payload = {
+    model: model || 'meta-llama/llama-3-8b-instruct:free',
+    messages: [
+      { role: 'system', content: systemInstruction },
+      { role: 'user', content: prompt }
+    ],
+    temperature: responseSchema ? 0.1 : 0.2,
+    ...(responseSchema ? { response_format: { type: 'json_object' } } : {})
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': window.location.origin,
+      'X-Title': 'Jeppiaar Shikshak SDC'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    const errorMsg = errData.error?.message || response.statusText;
+    throw new Error(`OpenRouter API Error: ${errorMsg}`);
+  }
+
+  const data = await response.json();
+  if (data.choices && data.choices[0] && data.choices[0].message) {
+    return data.choices[0].message.content;
+  }
+  throw new Error('Empty response payload from OpenRouter API.');
 }
