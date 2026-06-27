@@ -311,30 +311,49 @@ export default function Settings() {
             )}
 
             {/* Integration Tips */}
-            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '13px' }}>
-              <strong style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-warning)', marginBottom: '8px' }}>
-                <HelpCircle size={14} /> Integration Instructions
+            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', fontSize: '13px' }}>
+              <strong style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-warning)', marginBottom: '12px' }}>
+                <HelpCircle size={15} /> Guide: How to Get Your API Key
               </strong>
-              <ul style={{ marginLeft: '16px', listStyleType: 'disc', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {config.provider === 'gemini' && (
-                  <>
-                    <li>Get a Gemini API Key from Google AI Studio.</li>
-                    <li>API calls are performed client-side safely from your browser.</li>
-                  </>
-                )}
-                {config.provider === 'groq' && (
-                  <>
-                    <li>Create an account and obtain a free API key from the Groq console.</li>
-                    <li>Uses the ultra-fast <code>llama-3.1-8b-instant</code> model.</li>
-                  </>
-                )}
-                {config.provider === 'openrouter' && (
-                  <>
-                    <li>Get a free account API key from OpenRouter.ai.</li>
-                    <li>Queries the aggregated free <code>meta-llama/llama-3-8b-instruct:free</code> endpoint.</li>
-                  </>
-                )}
-              </ul>
+              
+              {config.provider === 'gemini' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', color: 'var(--text-secondary)' }}>
+                  <p style={{ margin: 0, fontWeight: '600', color: 'var(--text-primary)' }}>Google Gemini API Key Setup Process:</p>
+                  <ol style={{ marginLeft: '16px', paddingLeft: '0', display: 'flex', flexDirection: 'column', gap: '6px', listStyleType: 'decimal' }}>
+                    <li>Open <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>Google AI Studio</a> in a new tab.</li>
+                    <li>Log in with any standard Google/Gmail account.</li>
+                    <li>Click the blue <strong>"Get API key"</strong> button in the top-left sidebar menu.</li>
+                    <li>Click <strong>"Create API key"</strong>, select/create an associated Google Cloud project, and confirm.</li>
+                    <li>Copy your new API Key (starts with <code>AIzaSy...</code>) and paste it into the field above.</li>
+                  </ol>
+                </div>
+              )}
+
+              {config.provider === 'groq' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', color: 'var(--text-secondary)' }}>
+                  <p style={{ margin: 0, fontWeight: '600', color: 'var(--text-primary)' }}>Groq Console API Key Setup Process:</p>
+                  <ol style={{ marginLeft: '16px', paddingLeft: '0', display: 'flex', flexDirection: 'column', gap: '6px', listStyleType: 'decimal' }}>
+                    <li>Go to the <a href="https://console.groq.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>Groq Console</a> in a new tab.</li>
+                    <li>Register a free account or sign in.</li>
+                    <li>Navigate to the **API Keys** section in the left sidebar menu list.</li>
+                    <li>Click the **"Create API Key"** button, name the key (e.g. "SDC Tool"), and copy the key.</li>
+                    <li>Copy your key (starts with <code>gsk_...</code>) and paste it into the field above.</li>
+                  </ol>
+                </div>
+              )}
+
+              {config.provider === 'openrouter' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', color: 'var(--text-secondary)' }}>
+                  <p style={{ margin: 0, fontWeight: '600', color: 'var(--text-primary)' }}>OpenRouter API Key Setup Process:</p>
+                  <ol style={{ marginLeft: '16px', paddingLeft: '0', display: 'flex', flexDirection: 'column', gap: '6px', listStyleType: 'decimal' }}>
+                    <li>Open <a href="https://openrouter.ai/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>OpenRouter.ai</a> in a new tab.</li>
+                    <li>Create an account or login using email, Google, or GitHub.</li>
+                    <li>Go to your dashboard and select **API Keys** from the navigation.</li>
+                    <li>Click the **"Create Key"** button, set a name, and generate the credentials.</li>
+                    <li>Copy the resulting token (starts with <code>sk-or-...</code>) and paste it into the field above.</li>
+                  </ol>
+                </div>
+              )}
             </div>
 
             {/* Test Connection Panel */}
