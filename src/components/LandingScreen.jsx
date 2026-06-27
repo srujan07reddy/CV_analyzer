@@ -157,12 +157,14 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
           {role === 'student' ? (
             <>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <label htmlFor="student-roll-number" style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Roll Number
                 </label>
                 <div style={{ position: 'relative' }}>
                   <User size={18} color="#64748b" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
                   <input
+                    id="student-roll-number"
+                    name="student-roll-number"
                     type="text"
                     value={rollNumber}
                     onChange={e => setRollNumber(e.target.value)}
@@ -174,12 +176,14 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <label htmlFor="student-dob" style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Date of Birth
                 </label>
                 <div style={{ position: 'relative' }}>
                   <Key size={18} color="#64748b" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
                   <input
+                    id="student-dob"
+                    name="student-dob"
                     type="text"
                     value={dob}
                     onChange={e => setDob(e.target.value)}
@@ -194,12 +198,14 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
           ) : (
             <>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <label htmlFor="management-email" style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Email Address
                 </label>
                 <div style={{ position: 'relative' }}>
                   <User size={18} color="#64748b" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
                   <input
+                    id="management-email"
+                    name="management-email"
                     type="text"
                     value={adminUser}
                     onChange={e => setAdminUser(e.target.value)}
@@ -210,12 +216,14 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <label htmlFor="management-password" style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Password
                 </label>
                 <div style={{ position: 'relative' }}>
                   <Key size={18} color="#64748b" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
                   <input
+                    id="management-password"
+                    name="management-password"
                     type={showPassword ? 'text' : 'password'}
                     value={adminPass}
                     onChange={e => setAdminPass(e.target.value)}

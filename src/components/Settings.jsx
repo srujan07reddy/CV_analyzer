@@ -172,8 +172,10 @@ export default function Settings() {
 
         {/* Enabled Checkbox Switch */}
         <div className="form-group" style={{ marginBottom: '24px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+          <label htmlFor="enable-ai-checkbox" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
             <input 
+              id="enable-ai-checkbox"
+              name="enable-ai-checkbox"
               type="checkbox" 
               checked={config.enabled}
               onChange={(e) => handleChange('enabled', e.target.checked)}
@@ -188,7 +190,7 @@ export default function Settings() {
             
             {/* API Key */}
             <div className="form-group">
-              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <label htmlFor="gemini-api-key" className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Gemini API Key</span>
                 <span 
                   style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px' }}
@@ -199,6 +201,8 @@ export default function Settings() {
               </label>
               <div style={{ position: 'relative' }}>
                 <input 
+                  id="gemini-api-key"
+                  name="gemini-api-key"
                   type={showKey ? 'text' : 'password'} 
                   className="form-control" 
                   placeholder="AIzaSy..."
@@ -285,8 +289,10 @@ export default function Settings() {
 
         <form onSubmit={handleUpdateAuth} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div className="form-group">
-            <label className="form-label">New Email Address</label>
+            <label htmlFor="new-admin-email" className="form-label">New Email Address</label>
             <input 
+              id="new-admin-email"
+              name="new-admin-email"
               type="email" 
               className="form-control" 
               placeholder="new_admin@jeppiaar.edu.in"
@@ -296,8 +302,10 @@ export default function Settings() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">New Password</label>
+            <label htmlFor="new-admin-password" className="form-label">New Password</label>
             <input 
+              id="new-admin-password"
+              name="new-admin-password"
               type="password" 
               className="form-control" 
               placeholder="••••••••"
@@ -344,8 +352,10 @@ export default function Settings() {
         {/* Member Form */}
         <form onSubmit={handleSaveMember} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '12px', padding: '16px' }}>
           <div className="form-group">
-            <label className="form-label">Full Name</label>
+            <label htmlFor="member-name" className="form-label">Full Name</label>
             <input 
+              id="member-name"
+              name="member-name"
               type="text" 
               className="form-control" 
               placeholder="e.g. Dr. Kishore" 
@@ -355,8 +365,10 @@ export default function Settings() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Email Address</label>
+            <label htmlFor="member-email" className="form-label">Email Address</label>
             <input 
+              id="member-email"
+              name="member-email"
               type="email" 
               className="form-control" 
               placeholder="e.g. kishore@jeppiaar.edu.in" 
@@ -366,8 +378,10 @@ export default function Settings() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Role</label>
+            <label htmlFor="member-role" className="form-label">Role</label>
             <select 
+              id="member-role"
+              name="member-role"
               className="form-control" 
               value={memberForm.role} 
               onChange={e => setMemberForm({ ...memberForm, role: e.target.value })}
@@ -379,8 +393,10 @@ export default function Settings() {
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label">Contact number</label>
+            <label htmlFor="member-contact" className="form-label">Contact number</label>
             <input 
+              id="member-contact"
+              name="member-contact"
               type="text" 
               className="form-control" 
               placeholder="e.g. 9876543210" 

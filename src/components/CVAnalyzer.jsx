@@ -726,8 +726,10 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Full Name</label>
+                      <label htmlFor="parsed-name" style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Full Name</label>
                       <input 
+                        id="parsed-name"
+                        name="parsed-name"
                         type="text" 
                         value={parsedStudent.name} 
                         onChange={(e) => setParsedStudent(prev => ({ ...prev, name: e.target.value }))}
@@ -735,8 +737,10 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Roll Number</label>
+                      <label htmlFor="parsed-roll" style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Roll Number</label>
                       <input 
+                        id="parsed-roll"
+                        name="parsed-roll"
                         type="text" 
                         value={parsedStudent.roll_number} 
                         onChange={(e) => setParsedStudent(prev => ({ ...prev, roll_number: e.target.value.toUpperCase() }))}
@@ -744,8 +748,10 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Department</label>
+                      <label htmlFor="parsed-dept" style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Department</label>
                       <select 
+                        id="parsed-dept"
+                        name="parsed-dept"
                         value={parsedStudent.department} 
                         onChange={(e) => setParsedStudent(prev => ({ ...prev, department: e.target.value }))}
                         style={{ fontSize: '13px', background: '#0f172a', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px 10px', width: '100%', outline: 'none', cursor: 'pointer' }}
@@ -757,8 +763,10 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
                       </select>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Top Extracted Skills</label>
+                      <label htmlFor="parsed-skills" style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Top Extracted Skills</label>
                       <input 
+                        id="parsed-skills"
+                        name="parsed-skills"
                         type="text" 
                         value={parsedStudent.top_skills} 
                         onChange={(e) => setParsedStudent(prev => ({ ...prev, top_skills: e.target.value }))}
@@ -766,8 +774,10 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Technical Skills</label>
+                      <label htmlFor="parsed-tech-skills" style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Technical Skills</label>
                       <input 
+                        id="parsed-tech-skills"
+                        name="parsed-tech-skills"
                         type="text" 
                         value={parsedStudent.technical_skills || ''} 
                         onChange={(e) => setParsedStudent(prev => ({ ...prev, technical_skills: e.target.value }))}
@@ -775,8 +785,10 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Projects</label>
+                      <label htmlFor="parsed-projects" style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Projects</label>
                       <input 
+                        id="parsed-projects"
+                        name="parsed-projects"
                         type="text" 
                         value={parsedStudent.projects || ''} 
                         onChange={(e) => setParsedStudent(prev => ({ ...prev, projects: e.target.value }))}
