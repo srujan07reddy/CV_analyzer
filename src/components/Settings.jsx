@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getLLMConfig, saveLLMConfig, queryLLM, callGemini, callGroq, callOpenRouter } from '../utils/llm';
+import { getLLMConfig, saveLLMConfig, queryLLM, callGemini, callGroq, callOpenRouter, autoDetectModel } from '../utils/llm';
 import { ShieldCheck, ShieldAlert, Cpu, Play, RefreshCw, Key, HelpCircle, UserCheck, Users, Trash2, Edit2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
@@ -12,6 +12,8 @@ export default function Settings() {
   const [testStatus, setTestStatus] = useState('idle'); // idle, testing, success, error
   const [testResult, setTestResult] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [modelDetectionStatus, setModelDetectionStatus] = useState('idle'); // idle, detecting, done, error
+  const [detectedModelLabel, setDetectedModelLabel] = useState('');
 
   // Auth Update State
   const [newEmail, setNewEmail] = useState('');
@@ -130,14 +132,37 @@ export default function Settings() {
       apiKey: loaded.apiKey || '',
       groqApiKey: loaded.groqApiKey || '',
       openrouterApiKey: loaded.openrouterApiKey || '',
+      detectedModel: loaded.detectedModel || '',
       enabled: loaded.enabled
     });
+    if (loaded.detectedModel) {
+      setDetectedModelLabel(`Auto-detected: ${loaded.detectedModel}`);
+      setModelDetectionStatus('done');
+    }
   }, []);
 
   const handleChange = (field, value) => {
     const updated = { ...config, [field]: value };
     setConfig(updated);
     saveLLMConfig(updated);
+  };
+
+  // Triggered when an API key field loses focus — auto-detects the best model for this provider+key
+  const handleKeyBlur = async (provider, apiKey) => {
+    if (!apiKey || apiKey.length < 10) return;
+    setModelDetectionStatus('detecting');
+    setDetectedModelLabel('Detecting best model for your key...');
+    try {
+      const { model, label } = await autoDetectModel(provider, apiKey);
+      const updated = { ...config, detectedModel: model };
+      setConfig(updated);
+      saveLLMConfig(updated);
+      setDetectedModelLabel(label);
+      setModelDetectionStatus('done');
+    } catch (err) {
+      setDetectedModelLabel(`Detection failed: ${err.message}`);
+      setModelDetectionStatus('error');
+    }
   };
 
   const handleTestConnection = async () => {
@@ -151,7 +176,7 @@ export default function Settings() {
         if (!config.groqApiKey) throw new Error('Groq API Key is empty.');
         response = await callGroq(
           config.groqApiKey,
-          'llama-3.1-8b-instant',
+          config.groqModel || 'llama-3.1-8b-instant',
           'You are a diagnostics assistant.',
           'Respond with "Connection successful, Guru!"'
         );
@@ -159,7 +184,7 @@ export default function Settings() {
         if (!config.openrouterApiKey) throw new Error('OpenRouter API Key is empty.');
         response = await callOpenRouter(
           config.openrouterApiKey,
-          'meta-llama/llama-3-8b-instruct:free',
+          config.openrouterModel || 'meta-llama/llama-3-8b-instruct:free',
           'You are a diagnostics assistant.',
           'Respond with "Connection successful, Guru!"'
         );
@@ -168,7 +193,7 @@ export default function Settings() {
         response = await callGemini(
           config.apiKey,
           currentConfig.endpoint,
-          currentConfig.model,
+          config.geminiModel || 'gemini-1.5-flash',
           currentConfig.systemPrompt,
           'Diagnose system connectivity. Respond with "Connection successful, Guru!" if you can see this message.'
         );
@@ -231,22 +256,20 @@ export default function Settings() {
               <div className="form-group" style={{ animation: 'fadeIn 0.2s' }}>
                 <label htmlFor="gemini-api-key" className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Gemini API Key</span>
-                  <span 
-                    style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px' }}
-                    onClick={() => setShowKey(!showKey)}
-                  >
+                  <span style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px' }} onClick={() => setShowKey(!showKey)}>
                     {showKey ? 'Hide Key' : 'Reveal Key'}
                   </span>
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <input 
+                  <input
                     id="gemini-api-key"
                     name="gemini-api-key"
-                    type={showKey ? 'text' : 'password'} 
-                    className="form-control" 
-                    placeholder="AIzaSy..."
+                    type={showKey ? 'text' : 'password'}
+                    className="form-control"
+                    placeholder="Paste your Gemini API key here..."
                     value={config.apiKey || ''}
                     onChange={(e) => handleChange('apiKey', e.target.value)}
+                    onBlur={(e) => handleKeyBlur('gemini', e.target.value)}
                     style={{ paddingRight: '40px' }}
                   />
                   <Key size={16} style={{ position: 'absolute', right: '12px', top: '12px', color: 'var(--text-muted)' }} />
@@ -259,22 +282,20 @@ export default function Settings() {
               <div className="form-group" style={{ animation: 'fadeIn 0.2s' }}>
                 <label htmlFor="groq-api-key" className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Groq API Key</span>
-                  <span 
-                    style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px' }}
-                    onClick={() => setShowKey(!showKey)}
-                  >
+                  <span style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px' }} onClick={() => setShowKey(!showKey)}>
                     {showKey ? 'Hide Key' : 'Reveal Key'}
                   </span>
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <input 
+                  <input
                     id="groq-api-key"
                     name="groq-api-key"
-                    type={showKey ? 'text' : 'password'} 
-                    className="form-control" 
-                    placeholder="gsk_..."
+                    type={showKey ? 'text' : 'password'}
+                    className="form-control"
+                    placeholder="Paste your Groq API key here..."
                     value={config.groqApiKey || ''}
                     onChange={(e) => handleChange('groqApiKey', e.target.value)}
+                    onBlur={(e) => handleKeyBlur('groq', e.target.value)}
                     style={{ paddingRight: '40px' }}
                   />
                   <Key size={16} style={{ position: 'absolute', right: '12px', top: '12px', color: 'var(--text-muted)' }} />
@@ -287,26 +308,40 @@ export default function Settings() {
               <div className="form-group" style={{ animation: 'fadeIn 0.2s' }}>
                 <label htmlFor="openrouter-api-key" className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>OpenRouter API Key</span>
-                  <span 
-                    style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px' }}
-                    onClick={() => setShowKey(!showKey)}
-                  >
+                  <span style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12px' }} onClick={() => setShowKey(!showKey)}>
                     {showKey ? 'Hide Key' : 'Reveal Key'}
                   </span>
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <input 
+                  <input
                     id="openrouter-api-key"
                     name="openrouter-api-key"
-                    type={showKey ? 'text' : 'password'} 
-                    className="form-control" 
-                    placeholder="sk-or-..."
+                    type={showKey ? 'text' : 'password'}
+                    className="form-control"
+                    placeholder="Paste your OpenRouter API key here..."
                     value={config.openrouterApiKey || ''}
                     onChange={(e) => handleChange('openrouterApiKey', e.target.value)}
+                    onBlur={(e) => handleKeyBlur('openrouter', e.target.value)}
                     style={{ paddingRight: '40px' }}
                   />
                   <Key size={16} style={{ position: 'absolute', right: '12px', top: '12px', color: 'var(--text-muted)' }} />
                 </div>
+              </div>
+            )}
+
+            {/* Auto-detected Model Badge */}
+            {(modelDetectionStatus !== 'idle') && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px',
+                borderRadius: '8px', fontSize: '13px',
+                background: modelDetectionStatus === 'done' ? 'rgba(34,197,94,0.08)' : modelDetectionStatus === 'detecting' ? 'rgba(99,102,241,0.08)' : 'rgba(239,68,68,0.08)',
+                border: `1px solid ${modelDetectionStatus === 'done' ? 'rgba(34,197,94,0.25)' : modelDetectionStatus === 'detecting' ? 'rgba(99,102,241,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                color: modelDetectionStatus === 'done' ? 'var(--color-success)' : modelDetectionStatus === 'detecting' ? 'var(--color-primary)' : 'var(--color-error)',
+              }}>
+                {modelDetectionStatus === 'detecting' && <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+                {modelDetectionStatus === 'done' && <ShieldCheck size={14} />}
+                {modelDetectionStatus === 'error' && <ShieldAlert size={14} />}
+                <span>{detectedModelLabel}</span>
               </div>
             )}
 
