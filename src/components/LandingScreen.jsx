@@ -42,7 +42,8 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
           setError('Invalid management credentials.');
         }
       } catch (err) {
-        setError(err.message || 'Login failed. Please try again.');
+        const msg = typeof err === 'string' ? err : (err && err.message) ? err.message : 'Login failed. Please try again.';
+        setError(msg);
       } finally {
         setLoading(false);
       }
