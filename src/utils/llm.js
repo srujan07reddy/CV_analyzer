@@ -19,7 +19,7 @@ export function getLLMConfig() {
         apiKey: parsed.apiKey || '',
         groqApiKey: parsed.groqApiKey || '',
         openrouterApiKey: parsed.openrouterApiKey || '',
-        endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
+        endpoint: 'https://generativelanguage.googleapis.com/v1/models',
         model: 'gemini-1.5-flash',
         systemPrompt: DEFAULT_SYSTEM_PROMPT,
         enabled: !!parsed.enabled
@@ -33,7 +33,7 @@ export function getLLMConfig() {
     apiKey: '',
     groqApiKey: '',
     openrouterApiKey: '',
-    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
+    endpoint: 'https://generativelanguage.googleapis.com/v1/models',
     model: 'gemini-1.5-flash',
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     enabled: false
@@ -163,7 +163,7 @@ export async function callGemini(apiKey, endpoint, model, systemInstruction, pro
   }
   
   const modelName = model || 'gemini-1.5-flash';
-  const baseUrl = endpoint || 'https://generativelanguage.googleapis.com/v1beta/models';
+  const baseUrl = endpoint || 'https://generativelanguage.googleapis.com/v1/models';
   const url = `${baseUrl}/${modelName}:generateContent?key=${apiKey}`;
 
   const payload = {
