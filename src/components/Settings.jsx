@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getLLMConfig, saveLLMConfig, queryLLM } from '../utils/llm';
-import { ShieldCheck, ShieldAlert, Cpu, Play, RefreshCw, Key, HelpCircle } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Cpu, Play, RefreshCw, Key, HelpCircle, UserCheck } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 export default function Settings() {
   const [config, setConfig] = useState({
@@ -11,6 +12,38 @@ export default function Settings() {
   const [testStatus, setTestStatus] = useState('idle'); // idle, testing, success, error
   const [testResult, setTestResult] = useState('');
   const [showKey, setShowKey] = useState(false);
+
+  // Auth Update State
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [authUpdateStatus, setAuthUpdateStatus] = useState(''); // '', 'loading', 'success', 'error'
+  const [authUpdateMessage, setAuthUpdateMessage] = useState('');
+
+  const handleUpdateAuth = async (e) => {
+    e.preventDefault();
+    if (!newEmail && !newPassword) {
+      setAuthUpdateStatus('error');
+      setAuthUpdateMessage('Please enter a new email or new password.');
+      return;
+    }
+    setAuthUpdateStatus('loading');
+    try {
+      const updates = {};
+      if (newEmail) updates.email = newEmail;
+      if (newPassword) updates.password = newPassword;
+      
+      const { error } = await supabase.auth.updateUser(updates);
+      if (error) throw error;
+      
+      setAuthUpdateStatus('success');
+      setAuthUpdateMessage('Credentials updated successfully!');
+      setNewEmail('');
+      setNewPassword('');
+    } catch (err) {
+      setAuthUpdateStatus('error');
+      setAuthUpdateMessage(err.message);
+    }
+  };
 
   // Load config on mount
   useEffect(() => {
@@ -164,6 +197,64 @@ export default function Settings() {
 
           </div>
         )}
+      </div>
+
+      {/* Account Security Settings */}
+      <div className="glass-card">
+        <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <UserCheck style={{ color: 'var(--color-primary)' }} />
+          Admin Account Security
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '20px' }}>
+          Update your management login credentials. Leave a field blank if you do not wish to change it.
+        </p>
+
+        <form onSubmit={handleUpdateAuth} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="form-group">
+            <label className="form-label">New Email Address</label>
+            <input 
+              type="email" 
+              className="form-control" 
+              placeholder="new_admin@jeppiaar.edu.in"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">New Password</label>
+            <input 
+              type="password" 
+              className="form-control" 
+              placeholder="••••••••"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </div>
+
+          {authUpdateStatus === 'success' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-success)', background: 'rgba(16,185,129,0.08)', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', border: '1px solid rgba(16,185,129,0.2)' }}>
+              <ShieldCheck size={16} />
+              {authUpdateMessage}
+            </div>
+          )}
+
+          {authUpdateStatus === 'error' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-error)', background: 'rgba(239,68,68,0.08)', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <ShieldAlert size={16} />
+              {authUpdateMessage}
+            </div>
+          )}
+
+          <button 
+            type="submit" 
+            className="btn btn-primary" 
+            disabled={authUpdateStatus === 'loading'}
+            style={{ width: 'fit-content' }}
+          >
+            {authUpdateStatus === 'loading' ? 'Updating...' : 'Update Credentials'}
+          </button>
+        </form>
       </div>
     </div>
   );

@@ -45,7 +45,7 @@ export default function Dashboard({ students, onSaveStudent, onSaveStudents, onD
           {
             id: 1,
             sender: 'shishya',
-            text: `Guru garu, I am ready to discuss the performance, wellness, and outreach records of facilitator **${student.name}** (${student.roll_number}). Ask me any queries about their development metrics.`,
+            text: `Guru garu, I am ready to discuss the performance and outreach records of facilitator **${student.name}** (${student.roll_number}). Ask me any queries about their development metrics.`,
             timestamp: Date.now()
           }
         ]);
@@ -145,7 +145,39 @@ export default function Dashboard({ students, onSaveStudent, onSaveStudents, onD
       }
     }
   };
-  
+
+  const handleExportCSV = () => {
+    if (!students || students.length === 0) return;
+    
+    // Extract headers
+    const headersSet = new Set(['name', 'roll_number', 'department', 'dob', 'gender', 'contact_number', 'email', 'top_skills', 'projects']);
+    students.forEach(s => {
+      Object.keys(s).forEach(k => headersSet.add(k));
+    });
+    const headers = Array.from(headersSet);
+    
+    const csvContent = [
+      headers.join(','),
+      ...students.map(s => {
+        return headers.map(header => {
+          const val = s[header] !== undefined && s[header] !== null ? s[header] : '';
+          const strVal = typeof val === 'object' ? JSON.stringify(val) : String(val);
+          const escaped = strVal.replace(/"/g, '""');
+          return `"${escaped}"`;
+        }).join(',');
+      })
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `SDC_Student_Roster_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Form State
   const [rollNumber, setRollNumber] = useState('');
   const [name, setName] = useState('');
@@ -273,7 +305,7 @@ export default function Dashboard({ students, onSaveStudent, onSaveStudents, onD
     
     students.forEach(student => {
       Object.keys(student).forEach(key => {
-        if (!standardSet.has(key) && key !== 'metrics' && key !== 'leadership_score') {
+        if (!standardSet.has(key) && key !== 'metrics') {
           customHeaders.add(key);
         }
       });
@@ -374,7 +406,7 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
   const allKeys = new Set();
   yearFilteredStudents.forEach(s => {
     Object.keys(s).forEach(k => {
-      if (k !== 'roll_number' && k !== 'name' && k !== 'department' && k !== 'wellness_score' && k !== 'leadership_score') {
+      if (k !== 'roll_number' && k !== 'name' && k !== 'department') {
         allKeys.add(k);
       }
     });
@@ -860,6 +892,23 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
             <Sparkles size={16} />
             AI Roster Analysis
           </button>
+          {students.length > 0 && (
+            <button 
+              className="btn" 
+              style={{ 
+                background: 'rgba(16, 185, 129, 0.1)', 
+                color: 'var(--color-success)', 
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              onClick={handleExportCSV}
+            >
+              <FileSpreadsheet size={16} />
+              Export CSV
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={() => { setShowImportForm(!showImportForm); setShowAddForm(false); }}>
             {showImportForm ? 'Close Mass Upload' : 'Mass Upload Data (CSV/JSON/TXT)'}
           </button>
@@ -1284,7 +1333,7 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
 
           const studentHasStandard = false;
           const presentKeys = Object.keys(student).filter(k => 
-            k !== 'roll_number' && k !== 'name' && k !== 'department' && k !== 'metrics' && k !== 'leadership_score' && k !== 'wellness_score'
+            k !== 'roll_number' && k !== 'name' && k !== 'department' && k !== 'metrics'
           );
 
           return (

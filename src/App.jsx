@@ -28,7 +28,8 @@ import CVAnalyzer from './components/CVAnalyzer';
 import LandingScreen from './components/LandingScreen';
 import StudentPortal from './components/StudentPortal';
 import MessagesManager from './components/MessagesManager';
-import { LayoutDashboard, Globe, MessageSquare, RefreshCcw, Settings as SettingsIcon, Wifi, WifiOff, Users, BrainCircuit, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, Globe, MessageSquare, RefreshCcw, Settings as SettingsIcon, Wifi, WifiOff, Users, BrainCircuit, ArrowLeft, LogOut } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -105,7 +106,15 @@ export default function App() {
       // Restore session
       const savedRole = localStorage.getItem('userRole');
       if (savedRole === 'management') {
-        setView('management');
+        // VERIFY CRYPTOGRAPHIC SESSION FOR MANAGEMENT (Prevent Inspect Bypass)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setView('management');
+        } else {
+          // If they say they are management but have no token, kick them out
+          localStorage.removeItem('userRole');
+          setView('landing');
+        }
       } else if (savedRole === 'student') {
         const savedRoll = localStorage.getItem('studentRoll');
         if (savedRoll) {
@@ -136,9 +145,36 @@ export default function App() {
       processSyncQueue();
     }
 
+    // Set up Realtime listener for live updates on the messages table
+    const messageChannel = supabase
+      .channel('live-messages-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages'
+        },
+        (payload) => {
+          console.log('[Realtime] Message update received:', payload);
+          loadData();
+        }
+      )
+      .subscribe();
+
+    // Set up Auth Listener to kick user out if their session expires while logged in
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        localStorage.removeItem('userRole');
+        setView('landing');
+      }
+    });
+
     return () => {
       window.removeEventListener('online', handleConnectionChange);
       window.removeEventListener('offline', handleConnectionChange);
+      subscription.unsubscribe();
+      supabase.removeChannel(messageChannel);
     };
   }, []);
 
@@ -372,12 +408,46 @@ export default function App() {
     setStudents(prev => prev.map(s => s.roll_number === updatedStudent.roll_number ? updatedStudent : s));
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem('userRole');
     localStorage.removeItem('studentRoll');
     setCurrentStudent(null);
     setView('landing');
+    
+    // Destroy cryptographic session if it exists
+    await supabase.auth.signOut();
   };
+
+  // Automatic inactivity auto-logout (15 minutes)
+  useEffect(() => {
+    if (view === 'landing') return;
+
+    let timeoutId;
+    const idleLimit = 15 * 60 * 1000; // 15 minutes
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        console.log('[Idle Session] User idle for 15 minutes. Logging out.');
+        handleLogout();
+      }, idleLimit);
+    };
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [view]);
+
 
   if (view === 'landing') {
     return <LandingScreen onManagementLogin={handleManagementLogin} onStudentLogin={handleStudentLogin} />;
@@ -413,7 +483,7 @@ export default function App() {
               cursor: 'pointer'
             }}
           >
-            <ArrowLeft size={14} /> Back to Home
+            <LogOut size={14} /> Logout
           </button>
           <div className={`network-badge ${isOnline ? 'online' : 'offline'}`}>
             {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}

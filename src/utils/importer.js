@@ -51,7 +51,14 @@ export function getYearFromRoll(roll) {
   const cleanRoll = roll.toString().trim().toUpperCase();
   const match = cleanRoll.match(/^(\d{2})/);
   if (match) {
-    return '20' + match[1];
+    const yearCode = match[1];
+    switch (yearCode) {
+      case '22': return 'Passed Out';
+      case '23': return '4th Year';
+      case '24': return '3rd Year';
+      case '25': return '2nd Year';
+      default: return '20' + yearCode;
+    }
   }
   return 'Unknown';
 }

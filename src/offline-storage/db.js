@@ -6,151 +6,544 @@ const handleResponse = ({ data, error }) => {
   return data;
 };
 
+// Local Cache Helpers
+const getLocal = (key) => {
+  try {
+    const raw = localStorage.getItem(`sdc_cache_${key}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const setLocal = (key, data) => {
+  try {
+    localStorage.setItem(`sdc_cache_${key}`, JSON.stringify(data));
+  } catch (e) {
+    console.error(`Failed to set local cache for ${key}:`, e);
+  }
+};
+
 // Student CRUD
 export async function getAllStudents() {
-  const res = await supabase.from('students').select('*');
-  return handleResponse(res) || [];
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('students').select('*');
+      const data = handleResponse(res) || [];
+      setLocal('students', data);
+      return data;
+    } catch (err) {
+      console.warn('[Offline Fallback] Failed to fetch students from Supabase, loading from cache:', err);
+    }
+  }
+  return getLocal('students') || [];
 }
 
 export async function saveStudent(student) {
-  // Supabase upsert (requires primary key roll_number)
-  const res = await supabase.from('students').upsert(student).select();
-  return handleResponse(res);
+  // Update local cache first
+  const cache = getLocal('students') || [];
+  const idx = cache.findIndex(s => s.roll_number === student.roll_number);
+  if (idx > -1) {
+    cache[idx] = { ...cache[idx], ...student };
+  } else {
+    cache.push(student);
+  }
+  setLocal('students', cache);
+
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('students').upsert(student).select();
+      return handleResponse(res);
+    } catch (err) {
+      console.warn('[Offline Queue] Failed to upsert student to Supabase, queuing mutation:', err);
+      await addToSyncQueue('SAVE', 'student', student);
+      return [student];
+    }
+  } else {
+    await addToSyncQueue('SAVE', 'student', student);
+    return [student];
+  }
 }
 
 export async function deleteStudent(roll_number) {
-  const res = await supabase.from('students').delete().eq('roll_number', roll_number);
-  return handleResponse(res);
+  const cache = getLocal('students') || [];
+  const filtered = cache.filter(s => s.roll_number !== roll_number);
+  setLocal('students', filtered);
+
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('students').delete().eq('roll_number', roll_number);
+      return handleResponse(res);
+    } catch (err) {
+      console.warn('[Offline Queue] Failed to delete student from Supabase, queuing deletion:', err);
+      await addToSyncQueue('DELETE', 'student', { roll_number });
+      return null;
+    }
+  } else {
+    await addToSyncQueue('DELETE', 'student', { roll_number });
+    return null;
+  }
 }
 
 export async function getStudent(roll_number) {
-  const res = await supabase.from('students').select('*').eq('roll_number', roll_number).single();
-  // Supabase throws error if no rows returned via .single(), so catch it
-  if (res.error) {
-    if (res.error.code === 'PGRST116') return null; // PostgREST code for "not found"
-    throw new Error(res.error.message);
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('students').select('*').eq('roll_number', roll_number).single();
+      if (res.error) {
+        if (res.error.code === 'PGRST116') return null; // PostgREST code for "not found"
+        throw new Error(res.error.message);
+      }
+      const cache = getLocal('students') || [];
+      const idx = cache.findIndex(s => s.roll_number === roll_number);
+      if (idx > -1) {
+        cache[idx] = res.data;
+      } else {
+        cache.push(res.data);
+      }
+      setLocal('students', cache);
+      return res.data;
+    } catch (err) {
+      console.warn('[Offline Fallback] Failed to fetch student from Supabase, loading from cache:', err);
+    }
   }
-  return res.data;
+  const cache = getLocal('students') || [];
+  return cache.find(s => s.roll_number === roll_number) || null;
 }
 
 export async function clearAllStudents() {
-  const res = await supabase.from('students').delete().neq('roll_number', 'impossible_val');
-  return handleResponse(res);
+  setLocal('students', []);
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('students').delete().neq('roll_number', 'impossible_val');
+      return handleResponse(res);
+    } catch (err) {
+      console.warn('[Offline Fallback] Failed to delete all students from Supabase.', err);
+    }
+  }
+  return [];
 }
 
 // Outreach CRUD
 export async function getAllOutreach() {
-  const res = await supabase.from('outreach').select('*');
-  return handleResponse(res) || [];
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('outreach').select('*');
+      const data = handleResponse(res) || [];
+      setLocal('outreach', data);
+      return data;
+    } catch (err) {
+      console.warn('[Offline Fallback] Failed to fetch outreach from Supabase, loading from cache:', err);
+    }
+  }
+  return getLocal('outreach') || [];
 }
 
 export async function saveOutreach(outreach) {
-  const res = await supabase.from('outreach').upsert(outreach).select();
-  const data = handleResponse(res);
-  return data && data[0] ? data[0].id : null;
+  // Update local cache first
+  const cache = getLocal('outreach') || [];
+  let tempId = outreach.id;
+  if (!tempId) {
+    tempId = 'temp_' + Math.random().toString(36).substr(2, 9) + Date.now();
+  }
+  const toSave = { ...outreach, id: tempId };
+  
+  const idx = cache.findIndex(o => o.id === tempId);
+  if (idx > -1) {
+    cache[idx] = toSave;
+  } else {
+    cache.push(toSave);
+  }
+  setLocal('outreach', cache);
+
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('outreach').upsert(outreach).select();
+      const data = handleResponse(res);
+      const saved = data && data[0] ? data[0] : null;
+      if (saved) {
+        // replace temp item with real saved one
+        const updatedCache = getLocal('outreach') || [];
+        const tIdx = updatedCache.findIndex(o => o.id === tempId);
+        if (tIdx > -1) {
+          updatedCache[tIdx] = saved;
+        } else {
+          updatedCache.push(saved);
+        }
+        setLocal('outreach', updatedCache);
+        return saved.id;
+      }
+      return tempId;
+    } catch (err) {
+      console.warn('[Offline Queue] Failed to upsert outreach to Supabase, queuing mutation:', err);
+      await addToSyncQueue('SAVE', 'outreach', toSave);
+      return tempId;
+    }
+  } else {
+    await addToSyncQueue('SAVE', 'outreach', toSave);
+    return tempId;
+  }
 }
 
 export async function deleteOutreach(id) {
-  const res = await supabase.from('outreach').delete().eq('id', id);
-  return handleResponse(res);
+  const cache = getLocal('outreach') || [];
+  const filtered = cache.filter(o => o.id !== id);
+  setLocal('outreach', filtered);
+
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('outreach').delete().eq('id', id);
+      return handleResponse(res);
+    } catch (err) {
+      console.warn('[Offline Queue] Failed to delete outreach from Supabase, queuing deletion:', err);
+      await addToSyncQueue('DELETE', 'outreach', { id });
+      return null;
+    }
+  } else {
+    await addToSyncQueue('DELETE', 'outreach', { id });
+    return null;
+  }
 }
 
 export async function clearAllOutreach() {
-  const res = await supabase.from('outreach').delete().neq('id', -1);
-  return handleResponse(res);
+  setLocal('outreach', []);
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('outreach').delete().neq('id', -1);
+      return handleResponse(res);
+    } catch (err) {
+      console.warn('[Offline Fallback] Failed to clear outreach from Supabase.', err);
+    }
+  }
+  return [];
 }
 
 // Groups CRUD
 export async function getAllGroups() {
-  const res = await supabase.from('groups').select('*');
-  return handleResponse(res) || [];
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('groups').select('*');
+      const data = handleResponse(res) || [];
+      setLocal('groups', data);
+      return data;
+    } catch (err) {
+      console.warn('[Offline Fallback] Failed to fetch groups from Supabase, loading from cache:', err);
+    }
+  }
+  return getLocal('groups') || [];
 }
 
 export async function saveGroup(group) {
-  const res = await supabase.from('groups').upsert(group).select();
-  const data = handleResponse(res);
-  return data && data[0] ? data[0].id : null;
+  const cache = getLocal('groups') || [];
+  let tempId = group.id;
+  if (!tempId) {
+    tempId = 'temp_' + Math.random().toString(36).substr(2, 9) + Date.now();
+  }
+  const toSave = { ...group, id: tempId };
+
+  const idx = cache.findIndex(g => g.id === tempId);
+  if (idx > -1) {
+    cache[idx] = toSave;
+  } else {
+    cache.push(toSave);
+  }
+  setLocal('groups', cache);
+
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('groups').upsert(group).select();
+      const data = handleResponse(res);
+      const saved = data && data[0] ? data[0] : null;
+      if (saved) {
+        const updatedCache = getLocal('groups') || [];
+        const tIdx = updatedCache.findIndex(g => g.id === tempId);
+        if (tIdx > -1) {
+          updatedCache[tIdx] = saved;
+        } else {
+          updatedCache.push(saved);
+        }
+        setLocal('groups', updatedCache);
+        return saved.id;
+      }
+      return tempId;
+    } catch (err) {
+      console.warn('[Offline Queue] Failed to upsert group to Supabase, queuing mutation:', err);
+      await addToSyncQueue('SAVE', 'group', toSave);
+      return tempId;
+    }
+  } else {
+    await addToSyncQueue('SAVE', 'group', toSave);
+    return tempId;
+  }
 }
 
 export async function deleteGroup(id) {
-  const res = await supabase.from('groups').delete().eq('id', id);
-  return handleResponse(res);
+  const cache = getLocal('groups') || [];
+  const filtered = cache.filter(g => g.id !== id);
+  setLocal('groups', filtered);
+
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('groups').delete().eq('id', id);
+      return handleResponse(res);
+    } catch (err) {
+      console.warn('[Offline Queue] Failed to delete group from Supabase, queuing deletion:', err);
+      await addToSyncQueue('DELETE', 'group', { id });
+      return null;
+    }
+  } else {
+    await addToSyncQueue('DELETE', 'group', { id });
+    return null;
+  }
 }
 
 export async function clearAllGroups() {
-  const res = await supabase.from('groups').delete().neq('id', -1);
-  return handleResponse(res);
+  setLocal('groups', []);
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('groups').delete().neq('id', -1);
+      return handleResponse(res);
+    } catch (err) {
+      console.warn('[Offline Fallback] Failed to clear groups from Supabase.', err);
+    }
+  }
+  return [];
 }
 
 // Messages CRUD (Management → Student)
 export async function getAllMessages() {
-  const res = await supabase.from('messages').select('*');
-  return handleResponse(res) || [];
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('messages').select('*');
+      const data = handleResponse(res) || [];
+      setLocal('messages', data);
+      return data;
+    } catch (err) {
+      console.warn('[Offline Fallback] Failed to fetch messages from Supabase, loading from cache:', err);
+    }
+  }
+  return getLocal('messages') || [];
 }
 
 export async function getMessagesByRoll(roll_number) {
-  const res = await supabase
-    .from('messages')
-    .select('*')
-    .or(`roll_number.eq.${roll_number.toUpperCase()},roll_number.eq.ALL`);
-  return handleResponse(res) || [];
+  const all = await getAllMessages();
+  const upperRoll = roll_number.toUpperCase();
+  return all.filter(m => m.roll_number === upperRoll || m.roll_number === 'ALL');
 }
 
 export async function saveMessage(message) {
-  const res = await supabase.from('messages').upsert(message).select();
-  const data = handleResponse(res);
-  return data && data[0] ? data[0].id : null;
+  const cache = getLocal('messages') || [];
+  let tempId = message.id;
+  if (!tempId) {
+    tempId = 'temp_' + Math.random().toString(36).substr(2, 9) + Date.now();
+  }
+  const toSave = { ...message, id: tempId };
+
+  const idx = cache.findIndex(m => m.id === tempId);
+  if (idx > -1) {
+    cache[idx] = toSave;
+  } else {
+    cache.push(toSave);
+  }
+  setLocal('messages', cache);
+
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('messages').upsert(message).select();
+      const data = handleResponse(res);
+      const saved = data && data[0] ? data[0] : null;
+      if (saved) {
+        const updatedCache = getLocal('messages') || [];
+        const tIdx = updatedCache.findIndex(m => m.id === tempId);
+        if (tIdx > -1) {
+          updatedCache[tIdx] = saved;
+        } else {
+          updatedCache.push(saved);
+        }
+        setLocal('messages', updatedCache);
+        return saved.id;
+      }
+      return tempId;
+    } catch (err) {
+      console.warn('[Offline Queue] Failed to upsert message to Supabase, queuing mutation:', err);
+      await addToSyncQueue('SAVE', 'message', toSave);
+      return tempId;
+    }
+  } else {
+    await addToSyncQueue('SAVE', 'message', toSave);
+    return tempId;
+  }
 }
 
 export async function deleteMessage(id) {
-  const res = await supabase.from('messages').delete().eq('id', id);
-  return handleResponse(res);
+  const cache = getLocal('messages') || [];
+  const filtered = cache.filter(m => m.id !== id);
+  setLocal('messages', filtered);
+
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('messages').delete().eq('id', id);
+      return handleResponse(res);
+    } catch (err) {
+      console.warn('[Offline Queue] Failed to delete message from Supabase, queuing deletion:', err);
+      await addToSyncQueue('DELETE', 'message', { id });
+      return null;
+    }
+  } else {
+    await addToSyncQueue('DELETE', 'message', { id });
+    return null;
+  }
 }
 
 export async function clearAllMessages() {
-  const res = await supabase.from('messages').delete().neq('id', -1);
-  return handleResponse(res);
+  setLocal('messages', []);
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('messages').delete().neq('id', -1);
+      return handleResponse(res);
+    } catch (err) {
+      console.warn('[Offline Fallback] Failed to clear messages from Supabase.', err);
+    }
+  }
+  return [];
 }
 
 // Templates CRUD (Management-defined profile sections)
 export async function getAllTemplates() {
-  const res = await supabase.from('templates').select('*');
-  return handleResponse(res) || [];
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('templates').select('*');
+      const data = handleResponse(res) || [];
+      setLocal('templates', data);
+      return data;
+    } catch (err) {
+      console.warn('[Offline Fallback] Failed to fetch templates from Supabase, loading from cache:', err);
+    }
+  }
+  return getLocal('templates') || [];
 }
 
 export async function saveTemplate(template) {
-  const res = await supabase.from('templates').upsert(template).select();
-  const data = handleResponse(res);
-  return data && data[0] ? data[0].id : null;
+  const cache = getLocal('templates') || [];
+  let tempId = template.id;
+  if (!tempId) {
+    tempId = 'temp_' + Math.random().toString(36).substr(2, 9) + Date.now();
+  }
+  const toSave = { ...template, id: tempId };
+
+  const idx = cache.findIndex(t => t.id === tempId);
+  if (idx > -1) {
+    cache[idx] = toSave;
+  } else {
+    cache.push(toSave);
+  }
+  setLocal('templates', cache);
+
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('templates').upsert(template).select();
+      const data = handleResponse(res);
+      const saved = data && data[0] ? data[0] : null;
+      if (saved) {
+        const updatedCache = getLocal('templates') || [];
+        const tIdx = updatedCache.findIndex(t => t.id === tempId);
+        if (tIdx > -1) {
+          updatedCache[tIdx] = saved;
+        } else {
+          updatedCache.push(saved);
+        }
+        setLocal('templates', updatedCache);
+        return saved.id;
+      }
+      return tempId;
+    } catch (err) {
+      console.warn('[Offline Queue] Failed to upsert template to Supabase, queuing mutation:', err);
+      await addToSyncQueue('SAVE', 'template', toSave);
+      return tempId;
+    }
+  } else {
+    await addToSyncQueue('SAVE', 'template', toSave);
+    return tempId;
+  }
 }
 
 export async function deleteTemplate(id) {
-  const res = await supabase.from('templates').delete().eq('id', id);
-  return handleResponse(res);
+  const cache = getLocal('templates') || [];
+  const filtered = cache.filter(t => t.id !== id);
+  setLocal('templates', filtered);
+
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('templates').delete().eq('id', id);
+      return handleResponse(res);
+    } catch (err) {
+      console.warn('[Offline Queue] Failed to delete template from Supabase, queuing deletion:', err);
+      await addToSyncQueue('DELETE', 'template', { id });
+      return null;
+    }
+  } else {
+    await addToSyncQueue('DELETE', 'template', { id });
+    return null;
+  }
 }
 
 export async function clearAllTemplates() {
-  const res = await supabase.from('templates').delete().neq('id', -1);
-  return handleResponse(res);
+  setLocal('templates', []);
+  if (navigator.onLine) {
+    try {
+      const res = await supabase.from('templates').delete().neq('id', -1);
+      return handleResponse(res);
+    } catch (err) {
+      console.warn('[Offline Fallback] Failed to clear templates from Supabase.', err);
+    }
+  }
+  return [];
 }
 
-// Sync Queue Helpers (No-ops for online-only Supabase)
+// Sync Queue Helpers
+const QUEUE_KEY = 'sdc_sync_queue';
+
 export function initDB() {
-  return Promise.resolve(true); // Stub to not break initialization in App.jsx
+  return Promise.resolve(true);
 }
 
 export function getSyncQueue() {
-  return Promise.resolve([]);
+  try {
+    const raw = localStorage.getItem(QUEUE_KEY);
+    return Promise.resolve(raw ? JSON.parse(raw) : []);
+  } catch (e) {
+    return Promise.resolve([]);
+  }
 }
 
-export function addToSyncQueue() {
+export async function addToSyncQueue(action, entityType, data) {
+  const queue = await getSyncQueue();
+  
+  // Clean off temporary string IDs if it's a new SAVE operation to let Supabase autogenerate them
+  let cleanedData = { ...data };
+  if (action === 'SAVE' && typeof cleanedData.id === 'string' && cleanedData.id.startsWith('temp_')) {
+    delete cleanedData.id;
+  }
+
+  const newItem = {
+    id: Math.random().toString(36).substr(2, 9) + Date.now(),
+    action, // 'SAVE' | 'DELETE'
+    entityType, // 'student' | 'outreach' | 'group' | 'message' | 'template'
+    data: cleanedData,
+    timestamp: Date.now()
+  };
+  queue.push(newItem);
+  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
   return Promise.resolve();
 }
 
-export function removeFromSyncQueue() {
+export async function removeFromSyncQueue(id) {
+  const queue = await getSyncQueue();
+  const filtered = queue.filter(item => item.id !== id);
+  localStorage.setItem(QUEUE_KEY, JSON.stringify(filtered));
   return Promise.resolve();
 }
 
 export function clearSyncQueue() {
+  localStorage.removeItem(QUEUE_KEY);
   return Promise.resolve();
 }

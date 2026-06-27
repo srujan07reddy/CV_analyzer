@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BookOpen, Shield, GraduationCap, AlertCircle, Key, User } from 'lucide-react';
 import { getStudent } from '../offline-storage/db';
+import { supabase } from '../supabaseClient';
 
 export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
   const [role, setRole] = useState('student'); // 'student' | 'management'
@@ -10,7 +11,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
   const [dob, setDob] = useState('');
   
   // Management Auth State
-  const [adminUser, setAdminUser] = useState('');
+  const [adminUser, setAdminUser] = useState(''); // Will now be email
   const [adminPass, setAdminPass] = useState('');
   
   const [error, setError] = useState('');
@@ -22,15 +23,27 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
     
     if (role === 'management') {
       if (!adminUser.trim() || !adminPass.trim()) {
-        return setError('Please enter both username and password.');
+        return setError('Please enter both email and password.');
       }
       
       setLoading(true);
-      // Hardcoded management login for now
-      if (adminUser.trim().toLowerCase() === 'admin' && adminPass === 'admin123') {
-        onManagementLogin();
-      } else {
-        setError('Invalid management credentials.');
+      
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: adminUser.trim(),
+          password: adminPass
+        });
+        
+        if (error) throw error;
+        
+        if (data?.session) {
+          onManagementLogin();
+        } else {
+          setError('Invalid management credentials.');
+        }
+      } catch (err) {
+        setError(err.message || 'Login failed. Please try again.');
+      } finally {
         setLoading(false);
       }
       return;
@@ -170,7 +183,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
             <>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Username
+                  Email Address
                 </label>
                 <div style={{ position: 'relative' }}>
                   <User size={18} color="#64748b" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
@@ -178,7 +191,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
                     type="text"
                     value={adminUser}
                     onChange={e => setAdminUser(e.target.value)}
-                    placeholder="Admin Username"
+                    placeholder="admin@jeppiaar.edu.in"
                     style={{ width: '100%', padding: '14px 14px 14px 42px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '12px', color: '#e2e8f0', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
                   />
                 </div>
