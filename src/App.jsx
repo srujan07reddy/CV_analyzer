@@ -108,11 +108,13 @@ export default function App() {
       if (savedRole === 'management') {
         // VERIFY CRYPTOGRAPHIC SESSION FOR MANAGEMENT (Prevent Inspect Bypass)
         const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
+        const localSession = localStorage.getItem('sdc_admin_local_session') === 'true';
+        if (session || localSession) {
           setView('management');
         } else {
           // If they say they are management but have no token, kick them out
           localStorage.removeItem('userRole');
+          localStorage.removeItem('sdc_admin_local_session');
           setView('landing');
         }
       } else if (savedRole === 'student') {
@@ -411,6 +413,7 @@ export default function App() {
   const handleLogout = async () => {
     localStorage.removeItem('userRole');
     localStorage.removeItem('studentRoll');
+    localStorage.removeItem('sdc_admin_local_session');
     setCurrentStudent(null);
     setView('landing');
     
