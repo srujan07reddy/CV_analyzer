@@ -39,6 +39,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
         
         if (data?.session) {
           localStorage.setItem('sdc_admin_local_session', 'true');
+          localStorage.setItem('sdc_logged_in_email', data.session.user.email);
           onManagementLogin();
         } else {
           setError('Invalid management credentials.');
@@ -48,6 +49,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
         if (adminUser.trim() === 'admin@jeppiaar.edu.in' && adminPass === 'AdminPassword123') {
           console.log('[Auth Fallback] Authenticated via local credentials.');
           localStorage.setItem('sdc_admin_local_session', 'true');
+          localStorage.setItem('sdc_logged_in_email', 'admin@jeppiaar.edu.in');
           onManagementLogin();
         } else {
           const msg = typeof err === 'string' ? err : (err && err.message) ? err.message : 'Login failed. Please try again.';

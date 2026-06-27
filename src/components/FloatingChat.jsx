@@ -4,6 +4,9 @@ import { Send, Bot, User, AlertTriangle, RefreshCw, MessageSquare, X } from 'luc
 import { getLLMConfig, queryLLM } from '../utils/llm';
 
 export default function FloatingChat({ students, outreachList = [] }) {
+  const email = localStorage.getItem('sdc_logged_in_email') || 'global';
+  const getCacheKey = () => `sdc_floating_chat_history_${email}`;
+
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
@@ -21,11 +24,38 @@ export default function FloatingChat({ students, outreachList = [] }) {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Sync messages from cache when email shifts
   useEffect(() => {
+    try {
+      const cached = localStorage.getItem(getCacheKey());
+      if (cached) {
+        setMessages(JSON.parse(cached));
+      } else {
+        setMessages([
+          {
+            id: 1,
+            sender: 'shishya',
+            text: 'Guru garu, I am here to assist you. Ask me anything about our student rosters, departments, or outreach logs.',
+            timestamp: Date.now()
+          }
+        ]);
+      }
+    } catch (e) {
+      console.warn('Failed to parse cached chat history:', e);
+    }
+  }, [email]);
+
+  // Persist messages to cache on change
+  useEffect(() => {
+    try {
+      localStorage.setItem(getCacheKey(), JSON.stringify(messages));
+    } catch (e) {
+      console.error('Failed to cache chat history:', e);
+    }
     if (isOpen) {
       scrollToBottom();
     }
-  }, [messages, isOpen]);
+  }, [messages, isOpen, email]);
 
   const handleSend = async (e) => {
     e.preventDefault();

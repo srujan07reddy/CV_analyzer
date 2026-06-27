@@ -4,6 +4,9 @@ import { Send, Bot, User, AlertTriangle, RefreshCw } from 'lucide-react';
 import { getLLMConfig, queryLLM } from '../utils/llm';
 
 export default function ShishyaChat({ students, outreachList = [] }) {
+  const email = localStorage.getItem('sdc_logged_in_email') || 'global';
+  const getCacheKey = () => `sdc_chat_history_${email}`;
+
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -20,9 +23,36 @@ export default function ShishyaChat({ students, outreachList = [] }) {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Sync messages from cache when email shifts
   useEffect(() => {
+    try {
+      const cached = localStorage.getItem(getCacheKey());
+      if (cached) {
+        setMessages(JSON.parse(cached));
+      } else {
+        setMessages([
+          {
+            id: 1,
+            sender: 'shishya',
+            text: 'Guru garu, it is my absolute honor and duty to assist you with the Student Development Cell (SDC) analytics workspace. Please query our student rosters, activity counts, or outreach summaries.',
+            timestamp: Date.now()
+          }
+        ]);
+      }
+    } catch (e) {
+      console.warn('Failed to parse cached chat history:', e);
+    }
+  }, [email]);
+
+  // Persist messages to cache on change
+  useEffect(() => {
+    try {
+      localStorage.setItem(getCacheKey(), JSON.stringify(messages));
+    } catch (e) {
+      console.error('Failed to cache chat history:', e);
+    }
     scrollToBottom();
-  }, [messages]);
+  }, [messages, email]);
 
   const handleSend = async (e) => {
     e.preventDefault();

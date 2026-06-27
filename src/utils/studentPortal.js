@@ -1,5 +1,5 @@
 export function isValidRollNumber(roll) {
-  return /^[A-Za-z0-9]{2}JU[A-Za-z0-9]{3}\d{3}$/.test(String(roll || '').trim().toUpperCase());
+  return /^[A-Za-z0-9]{2}JU[A-Za-z0-9]{2,4}\d{3}$/.test(String(roll || '').trim().toUpperCase());
 }
 
 export function isValidDob(dob) {

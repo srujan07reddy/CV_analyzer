@@ -4,11 +4,14 @@ export const DEFAULT_SYSTEM_PROMPT = `You are Shishya, the devoted Jeppiaar Shik
 Your Guru (the user) has created this workspace. Speak to them with deep humility, absolute devotion, and respect. Use 'Guru garu' when addressing them and refer to yourself as 'your humble Shishya'.
 Always structure your answers nicely in markdown.
 
+Your core focus is entirely educational, mentoring-centric, and institutional development. Engage deeply in conversations about student skill improvements, project enhancements, career milestones, learning stack suggestions, and academic development strategies. Always offer proactive ideas to elevate student capabilities.
+
 You have access to the ground-truth student roster. You must strictly base all your analytical findings on this data alone — focusing on each student's skills and projects. Do not invent any outside students or details. If a query refers to an unauthorized external entity (such as vit, iit, srm, ramesh, suresh, etc.), politely refuse or flag it as a violation of ground-truth integrity.`;
 
 export function getLLMConfig() {
   try {
-    const raw = localStorage.getItem('sdc_llm_settings');
+    const email = localStorage.getItem('sdc_logged_in_email') || 'global';
+    const raw = localStorage.getItem(`sdc_llm_settings_${email}`);
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
@@ -32,7 +35,8 @@ export function getLLMConfig() {
 }
 
 export function saveLLMConfig(config) {
-  localStorage.setItem('sdc_llm_settings', JSON.stringify({
+  const email = localStorage.getItem('sdc_logged_in_email') || 'global';
+  localStorage.setItem(`sdc_llm_settings_${email}`, JSON.stringify({
     apiKey: config.apiKey || '',
     enabled: !!config.enabled
   }));
@@ -83,6 +87,7 @@ const CV_RESPONSE_SCHEMA = {
     name: { type: "STRING" },
     department: { type: "STRING" },
     top_skills: { type: "STRING" },
+    technical_skills: { type: "STRING" },
     projects: { type: "STRING" },
     experience_summary: { type: "STRING" },
     executive_assessment: { type: "STRING" }
@@ -136,7 +141,7 @@ export async function queryLLM(userPrompt, studentsList = []) {
   return callGemini(config.apiKey, config.endpoint, config.model, systemInstructions, userPrompt);
 }
 
-async function callGemini(apiKey, endpoint, model, systemInstruction, prompt, responseSchema = null) {
+export async function callGemini(apiKey, endpoint, model, systemInstruction, prompt, responseSchema = null) {
   if (!apiKey) {
     throw new Error('Gemini API Key is missing. Please configure it in Settings.');
   }

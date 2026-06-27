@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getLLMConfig, saveLLMConfig, queryLLM } from '../utils/llm';
-import { ShieldCheck, ShieldAlert, Cpu, Play, RefreshCw, Key, HelpCircle, UserCheck } from 'lucide-react';
+import { getLLMConfig, saveLLMConfig, queryLLM, callGemini } from '../utils/llm';
+import { ShieldCheck, ShieldAlert, Cpu, Play, RefreshCw, Key, HelpCircle, UserCheck, Users, Trash2, Edit2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 export default function Settings() {
@@ -18,6 +18,83 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState('');
   const [authUpdateStatus, setAuthUpdateStatus] = useState(''); // '', 'loading', 'success', 'error'
   const [authUpdateMessage, setAuthUpdateMessage] = useState('');
+
+  // Management Members State
+  const [members, setMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [memberForm, setMemberForm] = useState({ id: '', name: '', email: '', role: 'Coordinator', contact_info: '' });
+  const [isEditingMember, setIsEditingMember] = useState(false);
+
+  const fetchMembers = async () => {
+    setLoadingMembers(true);
+    try {
+      const { data, error } = await supabase
+        .from('management_members')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      setMembers(data || []);
+    } catch (err) {
+      console.error('Failed to fetch management members:', err);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const handleSaveMember = async (e) => {
+    e.preventDefault();
+    if (!memberForm.name.trim() || !memberForm.email.trim()) {
+      alert('Guru garu, name and email are required.');
+      return;
+    }
+    try {
+      if (memberForm.id) {
+        const { error } = await supabase
+          .from('management_members')
+          .update({
+            name: memberForm.name.trim(),
+            email: memberForm.email.trim(),
+            role: memberForm.role,
+            contact_info: memberForm.contact_info.trim()
+          })
+          .eq('id', memberForm.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('management_members')
+          .insert({
+            name: memberForm.name.trim(),
+            email: memberForm.email.trim(),
+            role: memberForm.role,
+            contact_info: memberForm.contact_info.trim()
+          });
+        if (error) throw error;
+      }
+      setMemberForm({ id: '', name: '', email: '', role: 'Coordinator', contact_info: '' });
+      setIsEditingMember(false);
+      fetchMembers();
+    } catch (err) {
+      alert(`Error saving member: ${err.message}`);
+    }
+  };
+
+  const handleDeleteMember = async (id) => {
+    if (!window.confirm('Guru garu, are you sure you want to remove this management member?')) return;
+    try {
+      const { error } = await supabase
+        .from('management_members')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      fetchMembers();
+    } catch (err) {
+      alert(`Error deleting member: ${err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    fetchMembers();
+  }, []);
 
   const handleUpdateAuth = async (e) => {
     e.preventDefault();
@@ -64,18 +141,15 @@ export default function Settings() {
     setTestStatus('testing');
     setTestResult('');
 
-    // Sample mock student data for testing the prompt context assembly
-    const mockStudents = [
-      { roll_number: 'xxJUyyyzzz', name: 'x', department: 'y', top_skills: 'Python, SQL', projects: 'AI Chatbot' }
-    ];
-    const mockOutreach = [];
-
     try {
-      // Test message
-      const response = await queryLLM(
-        'Diagnose system connectivity. Respond with "Connection successful, Guru!" if you can see this message.', 
-        mockStudents, 
-        mockOutreach
+      const currentConfig = getLLMConfig();
+      // Call Gemini directly with the typed API Key, bypassing config.enabled check
+      const response = await callGemini(
+        config.apiKey,
+        currentConfig.endpoint,
+        currentConfig.model,
+        currentConfig.systemPrompt,
+        'Diagnose system connectivity. Respond with "Connection successful, Guru!" if you can see this message.'
       );
       setTestStatus('success');
       setTestResult(response);
@@ -255,6 +329,146 @@ export default function Settings() {
             {authUpdateStatus === 'loading' ? 'Updating...' : 'Update Credentials'}
           </button>
         </form>
+      </div>
+
+      {/* Management Members Roster */}
+      <div className="glass-card" style={{ marginTop: '24px' }}>
+        <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Users style={{ color: 'var(--color-primary)' }} />
+          Management Members Directory
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '20px' }}>
+          Add or edit authorized administrators, heads, and coordinators who have administrative access to the platform.
+        </p>
+
+        {/* Member Form */}
+        <form onSubmit={handleSaveMember} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '12px', padding: '16px' }}>
+          <div className="form-group">
+            <label className="form-label">Full Name</label>
+            <input 
+              type="text" 
+              className="form-control" 
+              placeholder="e.g. Dr. Kishore" 
+              value={memberForm.name} 
+              onChange={e => setMemberForm({ ...memberForm, name: e.target.value })} 
+              required 
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Email Address</label>
+            <input 
+              type="email" 
+              className="form-control" 
+              placeholder="e.g. kishore@jeppiaar.edu.in" 
+              value={memberForm.email} 
+              onChange={e => setMemberForm({ ...memberForm, email: e.target.value })} 
+              required 
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Role</label>
+            <select 
+              className="form-control" 
+              value={memberForm.role} 
+              onChange={e => setMemberForm({ ...memberForm, role: e.target.value })}
+            >
+              <option value="Administrator">Administrator</option>
+              <option value="Department Head">Department Head</option>
+              <option value="Coordinator">Coordinator</option>
+              <option value="Facilitator Lead">Facilitator Lead</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Contact number</label>
+            <input 
+              type="text" 
+              className="form-control" 
+              placeholder="e.g. 9876543210" 
+              value={memberForm.contact_info} 
+              onChange={e => setMemberForm({ ...memberForm, contact_info: e.target.value })} 
+            />
+          </div>
+          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '12px', alignItems: 'center' }}>
+            {isEditingMember && (
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => {
+                  setMemberForm({ id: '', name: '', email: '', role: 'Coordinator', contact_info: '' });
+                  setIsEditingMember(false);
+                }}
+              >
+                Cancel
+              </button>
+            )}
+            <button type="submit" className="btn btn-primary">
+              {isEditingMember ? 'Update Member' : 'Add New Member'}
+            </button>
+          </div>
+        </form>
+
+        {/* Member Table */}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                <th style={{ padding: '10px 8px' }}>Name</th>
+                <th style={{ padding: '10px 8px' }}>Email</th>
+                <th style={{ padding: '10px 8px' }}>Role</th>
+                <th style={{ padding: '10px 8px' }}>Contact</th>
+                <th style={{ padding: '10px 8px', textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.map(member => (
+                <tr key={member.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                  <td style={{ padding: '10px 8px', fontWeight: '600' }}>{member.name}</td>
+                  <td style={{ padding: '10px 8px', fontFamily: 'monospace' }}>{member.email}</td>
+                  <td style={{ padding: '10px 8px' }}>
+                    <span style={{
+                      fontSize: '11px',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      background: member.role === 'Administrator' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(6, 182, 212, 0.1)',
+                      color: member.role === 'Administrator' ? 'var(--color-error)' : 'var(--color-primary)',
+                      border: '1px solid rgba(255,255,255,0.03)'
+                    }}>
+                      {member.role}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 8px', color: 'var(--text-secondary)' }}>{member.contact_info || 'N/A'}</td>
+                  <td style={{ padding: '10px 8px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button 
+                      onClick={() => {
+                        setMemberForm({ id: member.id, name: member.name, email: member.email, role: member.role, contact_info: member.contact_info || '' });
+                        setIsEditingMember(true);
+                      }}
+                      style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', padding: '4px', display: 'inline-flex', alignItems: 'center' }}
+                      title="Edit Member"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteMember(member.id)}
+                      style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: '4px', display: 'inline-flex', alignItems: 'center' }}
+                      title="Delete Member"
+                      disabled={member.email === 'admin@jeppiaar.edu.in'}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {members.length === 0 && (
+                <tr>
+                  <td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {loadingMembers ? 'Loading directory...' : 'No management members registered.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

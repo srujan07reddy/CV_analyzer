@@ -168,6 +168,7 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         localStorage.removeItem('userRole');
+        localStorage.removeItem('sdc_logged_in_email');
         setView('landing');
       }
     });

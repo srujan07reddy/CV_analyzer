@@ -345,6 +345,7 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
         name: parsed.name || 'x',
         department: parsed.department || 'Computer Science',
         top_skills: parsed.top_skills || 'General Facilitation',
+        technical_skills: parsed.technical_skills || '',
         projects: parsed.projects || '',
         experience_summary: parsed.experience_summary || '',
         raw_resume_text: cvText,
@@ -372,6 +373,7 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
           name: parsed.name || 'x',
           department: parsed.department || 'Computer Science',
           top_skills: parsed.top_skills || 'General Facilitation',
+          technical_skills: parsed.technical_skills || '',
           projects: parsed.projects || '',
           experience_summary: parsed.experience_summary || '',
           raw_resume_text: text,
@@ -761,6 +763,15 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
                         value={parsedStudent.top_skills} 
                         onChange={(e) => setParsedStudent(prev => ({ ...prev, top_skills: e.target.value }))}
                         style={{ fontSize: '13px', background: 'rgba(255,255,255,0.02)', color: 'var(--color-primary)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px 10px', width: '100%', outline: 'none' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Technical Skills</label>
+                      <input 
+                        type="text" 
+                        value={parsedStudent.technical_skills || ''} 
+                        onChange={(e) => setParsedStudent(prev => ({ ...prev, technical_skills: e.target.value }))}
+                        style={{ fontSize: '13px', background: 'rgba(255,255,255,0.02)', color: '#a78bfa', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '6px 10px', width: '100%', outline: 'none' }}
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
