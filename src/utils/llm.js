@@ -169,12 +169,9 @@ export async function callGemini(apiKey, endpoint, model, systemInstruction, pro
   const payload = {
     contents: [
       {
-        parts: [{ text: prompt }]
+        parts: [{ text: `${systemInstruction}\n\n${prompt}` }]
       }
     ],
-    system_instruction: {
-      parts: [{ text: systemInstruction }]
-    },
     generationConfig: {
       temperature: responseSchema ? 0.1 : 0.2,
       maxOutputTokens: 2048,
