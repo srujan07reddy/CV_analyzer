@@ -1,209 +1,156 @@
-// Jeppiaar Shikshak Platform - Local IndexedDB Manager
-const DB_NAME = 'SDC_Analytics_DB';
-const DB_VERSION = 3;
+import { supabase } from '../supabaseClient';
 
-export function initDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = (event) => {
-      console.error('[DB] Database failed to open:', event.target.error);
-      reject(event.target.error);
-    };
-
-    request.onsuccess = (event) => {
-      const db = event.target.result;
-      console.log('[DB] Database opened successfully');
-      resolve(db);
-    };
-
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      console.log('[DB] Running database upgrade/initialization...');
-
-      // Store 1: Student Manifests
-      if (!db.objectStoreNames.contains('students')) {
-        db.createObjectStore('students', { keyPath: 'roll_number' });
-        console.log('[DB] Created object store: students');
-      }
-
-      // Store 2: Outreach Metrics
-      if (!db.objectStoreNames.contains('outreach')) {
-        db.createObjectStore('outreach', { keyPath: 'id', autoIncrement: true });
-        console.log('[DB] Created object store: outreach');
-      }
-
-      // Store 3: Priority Background Sync Queue
-      if (!db.objectStoreNames.contains('sync_queue')) {
-        db.createObjectStore('sync_queue', { keyPath: 'id', autoIncrement: true });
-        console.log('[DB] Created object store: sync_queue');
-      }
-
-      // Store 4: Groups Management
-      if (!db.objectStoreNames.contains('groups')) {
-        db.createObjectStore('groups', { keyPath: 'id', autoIncrement: true });
-        console.log('[DB] Created object store: groups');
-      }
-
-      // Store 5: Management → Student Messages
-      // Schema: { id (auto), roll_number, title, body, timestamp, read }
-      if (!db.objectStoreNames.contains('messages')) {
-        db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
-        console.log('[DB] Created object store: messages');
-      }
-
-      // Store 6: Management Templates
-      // Schema: { id (auto), name, sections: ["Skills","Projects"], timestamp }
-      if (!db.objectStoreNames.contains('templates')) {
-        db.createObjectStore('templates', { keyPath: 'id', autoIncrement: true });
-        console.log('[DB] Created object store: templates');
-      }
-    };
-  });
-}
-
-// Helper generic database transaction executor
-function runTransaction(storeName, mode, callback) {
-  return initDB().then((db) => {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(storeName, mode);
-      const store = transaction.objectStore(storeName);
-      
-      let request;
-      try {
-        request = callback(store);
-      } catch (err) {
-        reject(err);
-        return;
-      }
-
-      transaction.oncomplete = () => {
-        resolve(request ? request.result : null);
-      };
-
-      transaction.onerror = (event) => {
-        reject(event.target.error);
-      };
-    });
-  });
-}
+// Helper to handle Supabase responses
+const handleResponse = ({ data, error }) => {
+  if (error) throw new Error(error.message);
+  return data;
+};
 
 // Student CRUD
-export function getAllStudents() {
-  return runTransaction('students', 'readonly', (store) => store.getAll());
+export async function getAllStudents() {
+  const res = await supabase.from('students').select('*');
+  return handleResponse(res) || [];
 }
 
-export function saveStudent(student) {
-  return runTransaction('students', 'readwrite', (store) => store.put(student));
+export async function saveStudent(student) {
+  // Supabase upsert (requires primary key roll_number)
+  const res = await supabase.from('students').upsert(student).select();
+  return handleResponse(res);
 }
 
-export function deleteStudent(roll_number) {
-  return runTransaction('students', 'readwrite', (store) => store.delete(roll_number));
+export async function deleteStudent(roll_number) {
+  const res = await supabase.from('students').delete().eq('roll_number', roll_number);
+  return handleResponse(res);
 }
 
-export function getStudent(roll_number) {
-  return runTransaction('students', 'readonly', (store) => store.get(roll_number));
+export async function getStudent(roll_number) {
+  const res = await supabase.from('students').select('*').eq('roll_number', roll_number).single();
+  // Supabase throws error if no rows returned via .single(), so catch it
+  if (res.error) {
+    if (res.error.code === 'PGRST116') return null; // PostgREST code for "not found"
+    throw new Error(res.error.message);
+  }
+  return res.data;
 }
 
-export function clearAllStudents() {
-  return runTransaction('students', 'readwrite', (store) => store.clear());
+export async function clearAllStudents() {
+  const res = await supabase.from('students').delete().neq('roll_number', 'impossible_val');
+  return handleResponse(res);
 }
 
 // Outreach CRUD
-export function getAllOutreach() {
-  return runTransaction('outreach', 'readonly', (store) => store.getAll());
+export async function getAllOutreach() {
+  const res = await supabase.from('outreach').select('*');
+  return handleResponse(res) || [];
 }
 
-export function saveOutreach(outreach) {
-  return runTransaction('outreach', 'readwrite', (store) => store.put(outreach));
+export async function saveOutreach(outreach) {
+  const res = await supabase.from('outreach').upsert(outreach).select();
+  const data = handleResponse(res);
+  return data && data[0] ? data[0].id : null;
 }
 
-export function deleteOutreach(id) {
-  return runTransaction('outreach', 'readwrite', (store) => store.delete(id));
+export async function deleteOutreach(id) {
+  const res = await supabase.from('outreach').delete().eq('id', id);
+  return handleResponse(res);
 }
 
-export function clearAllOutreach() {
-  return runTransaction('outreach', 'readwrite', (store) => store.clear());
+export async function clearAllOutreach() {
+  const res = await supabase.from('outreach').delete().neq('id', -1);
+  return handleResponse(res);
 }
 
 // Groups CRUD
-export function getAllGroups() {
-  return runTransaction('groups', 'readonly', (store) => store.getAll());
+export async function getAllGroups() {
+  const res = await supabase.from('groups').select('*');
+  return handleResponse(res) || [];
 }
 
-export function saveGroup(group) {
-  return runTransaction('groups', 'readwrite', (store) => store.put(group));
+export async function saveGroup(group) {
+  const res = await supabase.from('groups').upsert(group).select();
+  const data = handleResponse(res);
+  return data && data[0] ? data[0].id : null;
 }
 
-export function deleteGroup(id) {
-  return runTransaction('groups', 'readwrite', (store) => store.delete(id));
+export async function deleteGroup(id) {
+  const res = await supabase.from('groups').delete().eq('id', id);
+  return handleResponse(res);
 }
 
-export function clearAllGroups() {
-  return runTransaction('groups', 'readwrite', (store) => store.clear());
+export async function clearAllGroups() {
+  const res = await supabase.from('groups').delete().neq('id', -1);
+  return handleResponse(res);
 }
 
 // Messages CRUD (Management → Student)
-export function getAllMessages() {
-  return runTransaction('messages', 'readonly', (store) => store.getAll());
+export async function getAllMessages() {
+  const res = await supabase.from('messages').select('*');
+  return handleResponse(res) || [];
 }
 
-export function getMessagesByRoll(roll_number) {
-  return getAllMessages().then(all =>
-    all.filter(m => m.roll_number === roll_number.toUpperCase() || m.roll_number === 'ALL')
-  );
+export async function getMessagesByRoll(roll_number) {
+  const res = await supabase
+    .from('messages')
+    .select('*')
+    .or(`roll_number.eq.${roll_number.toUpperCase()},roll_number.eq.ALL`);
+  return handleResponse(res) || [];
 }
 
-export function saveMessage(message) {
-  return runTransaction('messages', 'readwrite', (store) => store.put(message));
+export async function saveMessage(message) {
+  const res = await supabase.from('messages').upsert(message).select();
+  const data = handleResponse(res);
+  return data && data[0] ? data[0].id : null;
 }
 
-export function deleteMessage(id) {
-  return runTransaction('messages', 'readwrite', (store) => store.delete(id));
+export async function deleteMessage(id) {
+  const res = await supabase.from('messages').delete().eq('id', id);
+  return handleResponse(res);
 }
 
-export function clearAllMessages() {
-  return runTransaction('messages', 'readwrite', (store) => store.clear());
+export async function clearAllMessages() {
+  const res = await supabase.from('messages').delete().neq('id', -1);
+  return handleResponse(res);
 }
 
 // Templates CRUD (Management-defined profile sections)
-export function getAllTemplates() {
-  return runTransaction('templates', 'readonly', (store) => store.getAll());
+export async function getAllTemplates() {
+  const res = await supabase.from('templates').select('*');
+  return handleResponse(res) || [];
 }
 
-export function saveTemplate(template) {
-  return runTransaction('templates', 'readwrite', (store) => store.put(template));
+export async function saveTemplate(template) {
+  const res = await supabase.from('templates').upsert(template).select();
+  const data = handleResponse(res);
+  return data && data[0] ? data[0].id : null;
 }
 
-export function deleteTemplate(id) {
-  return runTransaction('templates', 'readwrite', (store) => store.delete(id));
+export async function deleteTemplate(id) {
+  const res = await supabase.from('templates').delete().eq('id', id);
+  return handleResponse(res);
 }
 
-export function clearAllTemplates() {
-  return runTransaction('templates', 'readwrite', (store) => store.clear());
+export async function clearAllTemplates() {
+  const res = await supabase.from('templates').delete().neq('id', -1);
+  return handleResponse(res);
 }
 
-// Sync Queue Helpers
+// Sync Queue Helpers (No-ops for online-only Supabase)
+export function initDB() {
+  return Promise.resolve(true); // Stub to not break initialization in App.jsx
+}
+
 export function getSyncQueue() {
-  return runTransaction('sync_queue', 'readonly', (store) => store.getAll());
+  return Promise.resolve([]);
 }
 
-export function addToSyncQueue(action, entityType, data) {
-  const queueItem = {
-    action, // 'SAVE' or 'DELETE'
-    entityType, // 'student' or 'outreach'
-    data,
-    timestamp: Date.now()
-  };
-  return runTransaction('sync_queue', 'readwrite', (store) => store.add(queueItem));
+export function addToSyncQueue() {
+  return Promise.resolve();
 }
 
-export function removeFromSyncQueue(id) {
-  return runTransaction('sync_queue', 'readwrite', (store) => store.delete(id));
+export function removeFromSyncQueue() {
+  return Promise.resolve();
 }
 
 export function clearSyncQueue() {
-  return runTransaction('sync_queue', 'readwrite', (store) => {
-    return store.clear();
-  });
+  return Promise.resolve();
 }

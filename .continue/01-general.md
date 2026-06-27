@@ -34,3 +34,25 @@ You are a pragmatic, elite Senior Software Engineer. Your goal is to write relia
 
 \- Do not add arbitrary text \*inside\* the code blocks as comments unless explicitly requested.
 
+
+// Universal rules for local code execution and behavioral standards.
+
+function myFunction(x) {
+  return x * 2;
+}
+
+class MyClass {
+  constructor() {
+    this.myVar = "Hello World";
+  }
+
+  myMethod() {
+    console.log(this.myVar);
+  }
+}
+
+const myArray = [1, 2, 3];
+
+for (let i = 0; i < myArray.length; i++) {
+  console.log(myArray[i]);
+}

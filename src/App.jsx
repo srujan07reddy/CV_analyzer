@@ -21,13 +21,13 @@ import seedStudents from './utils/seed-data.json';
 import Dashboard from './components/Dashboard';
 import OutreachTracker from './components/OutreachTracker';
 import ShishyaChat from './components/ShishyaChat';
-import SyncStatus from './components/SyncStatus';
 import Settings from './components/Settings';
 import GroupsTracker from './components/GroupsTracker';
 import FloatingChat from './components/FloatingChat';
 import CVAnalyzer from './components/CVAnalyzer';
 import LandingScreen from './components/LandingScreen';
-import StudentPortal from './components/student/StudentProfile';
+import StudentPortal from './components/StudentPortal';
+import MessagesManager from './components/MessagesManager';
 import { LayoutDashboard, Globe, MessageSquare, RefreshCcw, Settings as SettingsIcon, Wifi, WifiOff, Users, BrainCircuit, ArrowLeft } from 'lucide-react';
 
 export default function App() {
@@ -101,9 +101,23 @@ export default function App() {
       setStudents(finalStudents);
       setOutreachList(finalOutreach);
       setGroupsList(finalGroups);
-
+      
+      // Restore session
+      const savedRole = localStorage.getItem('userRole');
+      if (savedRole === 'management') {
+        setView('management');
+      } else if (savedRole === 'student') {
+        const savedRoll = localStorage.getItem('studentRoll');
+        if (savedRoll) {
+          const student = finalStudents.find(s => s.roll_number === savedRoll);
+          if (student) {
+            setCurrentStudent(student);
+            setView('student');
+          }
+        }
+      }
     } catch (err) {
-      console.error('[App] Failed to load data from IndexedDB:', err);
+      console.error('Failed to init DB or load data:', err);
     }
   };
 
@@ -342,20 +356,25 @@ export default function App() {
   };
 
   const handleManagementLogin = () => {
+    localStorage.setItem('userRole', 'management');
     setView('management');
-    setActiveTab('dashboard');
   };
 
   const handleStudentLogin = (student) => {
+    localStorage.setItem('userRole', 'student');
+    localStorage.setItem('studentRoll', student.roll_number);
     setCurrentStudent(student);
     setView('student');
   };
 
   const handleStudentUpdate = (updatedStudent) => {
     setCurrentStudent(updatedStudent);
+    setStudents(prev => prev.map(s => s.roll_number === updatedStudent.roll_number ? updatedStudent : s));
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('studentRoll');
     setCurrentStudent(null);
     setView('landing');
   };
@@ -424,6 +443,14 @@ export default function App() {
           </button>
           
           <button 
+            className={`nav-item ${activeTab === 'messages' ? 'active' : ''}`}
+            onClick={() => setActiveTab('messages')}
+          >
+            <MessageSquare size={18} />
+            Student Messages
+          </button>
+          
+          <button 
             className={`nav-item ${activeTab === 'outreach' ? 'active' : ''}`}
             onClick={() => setActiveTab('outreach')}
           >
@@ -445,14 +472,6 @@ export default function App() {
           >
             <MessageSquare size={18} />
             Shishya Chatbot
-          </button>
-
-          <button 
-            className={`nav-item ${activeTab === 'sync' ? 'active' : ''}`}
-            onClick={() => setActiveTab('sync')}
-          >
-            <RefreshCcw size={18} />
-            Database Sync
           </button>
 
           <button 
@@ -480,6 +499,10 @@ export default function App() {
             <CVAnalyzer students={students} onSaveStudent={handleSaveStudent} />
           </div>
 
+          <div style={{ display: activeTab === 'messages' ? 'block' : 'none' }}>
+            <MessagesManager students={students} />
+          </div>
+
           <div style={{ display: activeTab === 'outreach' ? 'block' : 'none' }}>
             <OutreachTracker 
               outreachList={outreachList}
@@ -498,12 +521,6 @@ export default function App() {
 
           <div style={{ display: activeTab === 'chatbot' ? 'block' : 'none' }}>
             <ShishyaChat students={students} outreachList={outreachList} />
-          </div>
-
-          <div style={{ display: activeTab === 'sync' ? 'block' : 'none' }}>
-            <SyncStatus 
-              onSyncComplete={loadData}
-            />
           </div>
 
           <div style={{ display: activeTab === 'settings' ? 'block' : 'none' }}>
