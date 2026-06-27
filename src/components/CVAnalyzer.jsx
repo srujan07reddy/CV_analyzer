@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { UploadCloud, FileText, CheckCircle, BrainCircuit, AlertCircle, FileSpreadsheet, Sparkles, X, RefreshCw } from 'lucide-react';
-import { getLLMConfig } from '../utils/llm';
+import { getLLMConfig, parseResumeWithAI } from '../utils/llm';
 import { getDeptFromRoll } from '../utils/importer';
-import { CV_PARSER_PROMPT } from '../utils/cv-prompt';
 
 export default function CVAnalyzer({ students = [], onSaveStudent }) {
   const [activeSubTab, setActiveSubTab] = useState('single'); // 'single' | 'bulk'
@@ -311,7 +310,15 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
         department,
         top_skills: foundSkills.join(', ') || 'General Facilitation',
         projects,
-        experience_summary: lines.slice(0, 10).join(' ').slice(0, 120) + '...'
+        experience_summary: lines.slice(0, 10).join(' ').slice(0, 120) + '...',
+        raw_resume_text: text,
+        ai_structured_data: {
+          roll_number: rollNumber,
+          name: extractedName,
+          department,
+          top_skills: foundSkills.join(', '),
+          projects
+        }
       },
       assessment: `### Local Heuristic Assessment (Fallback Mode)\n\n**Candidate Profile:**\n- Extracted Name: **${extractedName}**\n- Roll Number: **${rollNumber}**\n- Target Department: **${department}**\n\n*Note: Gemini AI settings are disabled or offline. Running localized regex heuristics rules to extract manifest metadata.*`
     };
@@ -330,110 +337,54 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
 
     setLoading(true);
 
-    const config = getLLMConfig();
-    if (config.enabled && config.apiKey) {
-      try {
-        const url = `${config.endpoint}/${config.model}:generateContent?key=${config.apiKey}`;
-        const prompt = CV_PARSER_PROMPT(cvText, defaultRollNumber);
+    try {
+      const parsed = await parseResumeWithAI(cvText, defaultRollNumber);
 
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.1 }
-          })
-        });
+      setParsedStudent({
+        roll_number: parsed.roll_number || defaultRollNumber || 'xxJUyyyzzz',
+        name: parsed.name || 'x',
+        department: parsed.department || 'Computer Science',
+        top_skills: parsed.top_skills || 'General Facilitation',
+        projects: parsed.projects || '',
+        experience_summary: parsed.experience_summary || '',
+        raw_resume_text: cvText,
+        ai_structured_data: parsed
+      });
 
-        if (!response.ok) {
-          throw new Error(`API response status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        
-        // Clean any Markdown code fences if returned by the LLM
-        const cleanJson = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleanJson);
-
-        setParsedStudent({
-          roll_number: parsed.roll_number || defaultRollNumber || 'xxJUyyyzzz',
-          name: parsed.name || 'x',
-          department: parsed.department || 'Computer Science',
-          top_skills: parsed.top_skills || 'General Facilitation',
-          projects: parsed.projects || '',
-          experience_summary: parsed.experience_summary || ''
-        });
-
-        setExecutiveAssessment(parsed.executive_assessment || 'No summary assessment generated.');
-      } catch (err) {
-        console.warn('AI Parsing failed, falling back to local heuristics:', err);
-        const fallback = runLocalHeuristicsParser(cvText, defaultRollNumber);
-        setParsedStudent(fallback.student);
-        setExecutiveAssessment(fallback.assessment + `\n\n*(AI API Handshake failed: ${err.message})*`);
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      // Local Heuristics
-      setTimeout(() => {
-        const fallback = runLocalHeuristicsParser(cvText, defaultRollNumber);
-        setParsedStudent(fallback.student);
-        setExecutiveAssessment(fallback.assessment);
-        setLoading(false);
-      }, 800);
+      setExecutiveAssessment(parsed.executive_assessment || 'No summary assessment generated.');
+    } catch (err) {
+      console.warn('AI Parsing failed, falling back to local heuristics:', err);
+      const fallback = runLocalHeuristicsParser(cvText, defaultRollNumber);
+      setParsedStudent(fallback.student);
+      setExecutiveAssessment(fallback.assessment + `\n\n*(AI API Handshake failed: ${err.message})*`);
+    } finally {
+      setLoading(false);
     }
   };
 
   const parseCVTextDirect = async (text, rollHint = '') => {
-    const config = getLLMConfig();
-    if (config.enabled && config.apiKey) {
-      try {
-        const url = `${config.endpoint}/${config.model}:generateContent?key=${config.apiKey}`;
-        const prompt = CV_PARSER_PROMPT(text, rollHint);
+    try {
+      const parsed = await parseResumeWithAI(text, rollHint);
 
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.1 }
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`API response status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const cleanJson = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleanJson);
-
-        return {
-          student: {
-            roll_number: parsed.roll_number || rollHint || 'xxJUyyyzzz',
-            name: parsed.name || 'x',
-            department: parsed.department || 'Computer Science',
-            top_skills: parsed.top_skills || 'General Facilitation',
-            projects: parsed.projects || '',
-            experience_summary: parsed.experience_summary || ''
-          },
-          assessment: parsed.executive_assessment || 'No summary assessment generated.'
-        };
-      } catch (err) {
-        console.warn('AI Parsing failed, falling back to local heuristics:', err);
-        const fallback = runLocalHeuristicsParser(text, rollHint);
-        return {
-          student: fallback.student,
-          assessment: fallback.assessment + `\n\n*(AI API Handshake failed: ${err.message})*`
-        };
-      }
-    } else {
+      return {
+        student: {
+          roll_number: parsed.roll_number || rollHint || 'xxJUyyyzzz',
+          name: parsed.name || 'x',
+          department: parsed.department || 'Computer Science',
+          top_skills: parsed.top_skills || 'General Facilitation',
+          projects: parsed.projects || '',
+          experience_summary: parsed.experience_summary || '',
+          raw_resume_text: text,
+          ai_structured_data: parsed
+        },
+        assessment: parsed.executive_assessment || 'No summary assessment generated.'
+      };
+    } catch (err) {
+      console.warn('AI Parsing failed, falling back to local heuristics:', err);
       const fallback = runLocalHeuristicsParser(text, rollHint);
       return {
         student: fallback.student,
-        assessment: fallback.assessment
+        assessment: fallback.assessment + `\n\n*(AI API Handshake failed: ${err.message})*`
       };
     }
   };

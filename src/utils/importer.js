@@ -102,6 +102,22 @@ function parseCSVLine(line) {
 }
 
 export function parseAndValidateCSV(csvText) {
+  if (!csvText || typeof csvText !== 'string') {
+    return {
+      success: false,
+      errors: ['File content is empty or invalid.'],
+      validRecords: []
+    };
+  }
+
+  if (csvText.startsWith('%PDF-')) {
+    return {
+      success: false,
+      errors: ['You uploaded a PDF file. The bulk upload tool only supports CSV, JSON, or plain text rosters. If you want to analyze a resume PDF, please use the CV Analyzer.'],
+      validRecords: []
+    };
+  }
+
   const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
   if (lines.length === 0) {
     return { success: false, errors: ['File is empty'], validRecords: [] };
@@ -308,6 +324,22 @@ export function generateCSVSampleTemplate() {
 }
 
 export function parseAndValidateMembers(csvText) {
+  if (!csvText || typeof csvText !== 'string') {
+    return {
+      success: false,
+      errors: ['File content is empty or invalid.'],
+      validRecords: []
+    };
+  }
+
+  if (csvText.startsWith('%PDF-')) {
+    return {
+      success: false,
+      errors: ['You uploaded a PDF file. The bulk upload tool only supports CSV, JSON, or plain text rosters. If you want to analyze a resume PDF, please use the CV Analyzer.'],
+      validRecords: []
+    };
+  }
+
   const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
   if (lines.length === 0) {
     return { success: false, errors: ['File is empty'], validRecords: [] };

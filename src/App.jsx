@@ -581,6 +581,7 @@ export default function App() {
               outreachList={outreachList}
               onSaveOutreach={handleSaveOutreach}
               onDeleteOutreach={handleDeleteOutreach}
+              students={students}
             />
           </div>
 
@@ -589,6 +590,7 @@ export default function App() {
               groupsList={groupsList}
               onSaveGroup={handleSaveGroup}
               onDeleteGroup={handleDeleteGroup}
+              students={students}
             />
           </div>
 

@@ -1,18 +1,9 @@
 // SDC Analytics Platform - Local-First Sync Queue
 import { 
   getSyncQueue, 
-  removeFromSyncQueue, 
-  saveStudent, 
-  deleteStudent, 
-  saveOutreach, 
-  deleteOutreach,
-  saveGroup,
-  deleteGroup,
-  saveMessage,
-  deleteMessage,
-  saveTemplate,
-  deleteTemplate
+  removeFromSyncQueue
 } from './db';
+import { supabase } from '../supabaseClient';
 
 // Subscribable listeners for sync events (to update frontend state)
 const syncListeners = new Set();
@@ -54,22 +45,23 @@ export async function processSyncQueue() {
       try {
         console.log(`[Sync Queue] Replaying action: ${item.action} on ${item.entityType}`, item.data);
         
+        let response;
         if (item.action === 'SAVE') {
           switch (item.entityType) {
             case 'student':
-              await saveStudent(item.data);
+              response = await supabase.from('students').upsert(item.data);
               break;
             case 'outreach':
-              await saveOutreach(item.data);
+              response = await supabase.from('outreach').upsert(item.data);
               break;
             case 'group':
-              await saveGroup(item.data);
+              response = await supabase.from('groups').upsert(item.data);
               break;
             case 'message':
-              await saveMessage(item.data);
+              response = await supabase.from('messages').upsert(item.data);
               break;
             case 'template':
-              await saveTemplate(item.data);
+              response = await supabase.from('templates').upsert(item.data);
               break;
             default:
               console.warn('[Sync Queue] Unknown save entity:', item.entityType);
@@ -77,23 +69,27 @@ export async function processSyncQueue() {
         } else if (item.action === 'DELETE') {
           switch (item.entityType) {
             case 'student':
-              await deleteStudent(item.data.roll_number);
+              response = await supabase.from('students').delete().eq('roll_number', item.data.roll_number);
               break;
             case 'outreach':
-              await deleteOutreach(item.data.id);
+              response = await supabase.from('outreach').delete().eq('id', item.data.id);
               break;
             case 'group':
-              await deleteGroup(item.data.id);
+              response = await supabase.from('groups').delete().eq('id', item.data.id);
               break;
             case 'message':
-              await deleteMessage(item.data.id);
+              response = await supabase.from('messages').delete().eq('id', item.data.id);
               break;
             case 'template':
-              await deleteTemplate(item.data.id);
+              response = await supabase.from('templates').delete().eq('id', item.data.id);
               break;
             default:
               console.warn('[Sync Queue] Unknown delete entity:', item.entityType);
           }
+        }
+
+        if (response && response.error) {
+          throw new Error(response.error.message);
         }
 
         await removeFromSyncQueue(item.id);

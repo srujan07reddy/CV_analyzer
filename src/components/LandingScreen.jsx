@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Shield, GraduationCap, AlertCircle, Key, User } from 'lucide-react';
+import { BookOpen, Shield, GraduationCap, AlertCircle, Key, User, Eye, EyeOff } from 'lucide-react';
 import { getStudent } from '../offline-storage/db';
 import { supabase } from '../supabaseClient';
 
@@ -13,6 +13,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
   // Management Auth State
   const [adminUser, setAdminUser] = useState(''); // Will now be email
   const [adminPass, setAdminPass] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -213,12 +214,31 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
                 <div style={{ position: 'relative' }}>
                   <Key size={18} color="#64748b" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     value={adminPass}
                     onChange={e => setAdminPass(e.target.value)}
                     placeholder="••••••••"
-                    style={{ width: '100%', padding: '14px 14px 14px 42px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '12px', color: '#e2e8f0', fontSize: '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace' }}
+                    style={{ width: '100%', padding: '14px 46px 14px 42px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '12px', color: '#e2e8f0', fontSize: '14px', outline: 'none', boxSizing: 'border-box', fontFamily: showPassword ? 'sans-serif' : 'monospace' }}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '14px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: '#64748b'
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
               </div>
             </>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSyncQueue, clearSyncQueue } from '../offline-storage/db';
+import { getSyncQueue, clearSyncQueue, removeFromSyncQueue } from '../offline-storage/db';
 import { processSyncQueue, subscribeToSync } from '../offline-storage/sync-queue';
 import { RefreshCw, Wifi, WifiOff, Trash2 } from 'lucide-react';
 
@@ -130,8 +130,22 @@ export default function SyncStatus({ onSyncComplete }) {
                   </span>
                   <strong>{item.entityType.toUpperCase()}</strong>: {item.data.name || item.data.target_location || item.data.roll_number || item.data.id}
                 </div>
-                <div style={{ color: 'var(--text-muted)' }}>
-                  {new Date(item.timestamp).toLocaleTimeString()}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    {new Date(item.timestamp).toLocaleTimeString()}
+                  </span>
+                  <button 
+                    onClick={async () => {
+                      if (window.confirm('Guru garu, are you sure you want to discard this specific sync operation?')) {
+                        await removeFromSyncQueue(item.id);
+                        await updateQueue();
+                      }
+                    }}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                    title="Discard Operation"
+                  >
+                    <Trash2 size={13} />
+                  </button>
                 </div>
               </div>
             ))}

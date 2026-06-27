@@ -1,4 +1,4 @@
-// SDC Analytics Platform - Gemini LLM Integration Client
+import { CV_PARSER_PROMPT } from './cv-prompt';
 
 export const DEFAULT_SYSTEM_PROMPT = `You are Shishya, the devoted Jeppiaar Shikshak AI analytics assistant.
 Your Guru (the user) has created this workspace. Speak to them with deep humility, absolute devotion, and respect. Use 'Guru garu' when addressing them and refer to yourself as 'your humble Shishya'.
@@ -74,6 +74,55 @@ ${studentsStr || 'No student records loaded.'}
 }
 
 /**
+ * Schema constraint for Gemini response to ensure strict CV structure
+ */
+const CV_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    roll_number: { type: "STRING" },
+    name: { type: "STRING" },
+    department: { type: "STRING" },
+    top_skills: { type: "STRING" },
+    projects: { type: "STRING" },
+    experience_summary: { type: "STRING" },
+    executive_assessment: { type: "STRING" }
+  },
+  required: ["roll_number", "name", "department"]
+};
+
+/**
+ * Parse a student's resume using the Gemini LLM with structured output mapping.
+ */
+export async function parseResumeWithAI(cvText, rollHint = '') {
+  const config = getLLMConfig();
+  if (!config.enabled || !config.apiKey) {
+    throw new Error('LLM integration is disabled or not configured.');
+  }
+
+  const systemInstructions = "You are a precise resume parsing agent. Extract and structure the candidate details exactly matching the requested JSON schema constraints.";
+  const userPrompt = CV_PARSER_PROMPT(cvText, rollHint);
+
+  const rawResponse = await callGemini(
+    config.apiKey,
+    config.endpoint,
+    config.model,
+    systemInstructions,
+    userPrompt,
+    CV_RESPONSE_SCHEMA
+  );
+
+  try {
+    if (!rawResponse || !rawResponse.trim()) {
+      throw new Error("Received an empty response from Gemini API.");
+    }
+    return JSON.parse(rawResponse.trim());
+  } catch (err) {
+    console.error("AI JSON parsing failed. Raw response was:", rawResponse, err);
+    throw new Error(`Failed to structure resume: ${err.message}`);
+  }
+}
+
+/**
  * Dispatches a prompt to the Gemini API
  */
 export async function queryLLM(userPrompt, studentsList = []) {
@@ -87,7 +136,7 @@ export async function queryLLM(userPrompt, studentsList = []) {
   return callGemini(config.apiKey, config.endpoint, config.model, systemInstructions, userPrompt);
 }
 
-async function callGemini(apiKey, endpoint, model, systemInstruction, prompt) {
+async function callGemini(apiKey, endpoint, model, systemInstruction, prompt, responseSchema = null) {
   if (!apiKey) {
     throw new Error('Gemini API Key is missing. Please configure it in Settings.');
   }
@@ -112,8 +161,12 @@ async function callGemini(apiKey, endpoint, model, systemInstruction, prompt) {
       ]
     },
     generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 2048
+      temperature: responseSchema ? 0.1 : 0.2,
+      maxOutputTokens: 2048,
+      ...(responseSchema ? {
+        responseMimeType: "application/json",
+        responseSchema: responseSchema
+      } : {})
     }
   };
 

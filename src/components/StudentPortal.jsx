@@ -7,6 +7,14 @@ import StudentMessages from './student/StudentMessages';
 export default function StudentPortal({ student, onLogout, onStudentUpdate }) {
   const [activeTab, setActiveTab] = useState('profile');
 
+  if (!student) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#0a0e1a', color: '#e2e8f0' }}>
+        Loading student profile...
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0a0e1a', color: '#e2e8f0', fontFamily: "'Inter', sans-serif" }}>
       {/* Sidebar */}

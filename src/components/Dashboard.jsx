@@ -219,9 +219,24 @@ export default function Dashboard({ students, onSaveStudent, onSaveStudents, onD
 
   const processFile = (file) => {
     if (!file) return;
-    const reader = new FileReader();
-    const fileType = file.name.split('.').pop().toLowerCase();
 
+    // Check file size (max 2MB) to prevent browser lockups
+    if (file.size > 2 * 1024 * 1024) {
+      setImportStatus('idle');
+      setImportErrors(['File is too large. Please upload files under 2MB.']);
+      return;
+    }
+
+    const nameParts = file.name.split('.');
+    const fileType = nameParts.length > 1 ? nameParts.pop().toLowerCase() : '';
+
+    if (fileType === 'pdf') {
+      setImportStatus('idle');
+      setImportErrors(['You selected a PDF file. The Bulk Import tool only supports CSV, JSON, or plain text student rosters. If you want to analyze a resume PDF, please use the CV Analyzer section instead.']);
+      return;
+    }
+
+    const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target.result;
       let result;
@@ -402,6 +417,30 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
       .map(([year, count]) => ({ year, count }))
       .sort((a, b) => a.year.localeCompare(b.year));
   }, [students]);
+
+  // Skill frequency stats computed from calculatedStudents
+  const skillStats = React.useMemo(() => {
+    const counts = {};
+    calculatedStudents.forEach(s => {
+      const skillsStr = s.top_skills || s.skills || '';
+      skillsStr.split(',').forEach(sk => {
+        const clean = sk.trim();
+        if (clean) {
+          const lower = clean.toLowerCase();
+          const existingKey = Object.keys(counts).find(k => k.toLowerCase() === lower);
+          if (existingKey) {
+            counts[existingKey]++;
+          } else {
+            counts[clean] = 1;
+          }
+        }
+      });
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [calculatedStudents]);
 
   const allKeys = new Set();
   yearFilteredStudents.forEach(s => {
@@ -1076,7 +1115,7 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
         <div>
           {/* SVG Charts Block */}
           {students.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '32px' }}>
               {/* Doughnut Chart */}
               <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '24px' }}>
                 <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text-secondary)' }}>Student Distribution Share</h4>
@@ -1140,6 +1179,30 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
                             <div style={{ width: `${percent}%`, height: '100%', background: 'linear-gradient(90deg, var(--color-secondary) 0%, var(--color-primary) 100%)', borderRadius: '4px' }}></div>
                           </div>
                           <span style={{ width: '30px', fontSize: '12px', fontWeight: '700', color: 'var(--color-primary)', textAlign: 'right' }}>{batch.count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Skill Frequency Card */}
+              <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text-secondary)' }}>Trending SDC Skills</h4>
+                {skillStats.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '40px 0' }}>No skills configured</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {skillStats.map((skill) => {
+                      const maxCount = Math.max(...skillStats.map(s => s.count));
+                      const percent = maxCount > 0 ? (skill.count / maxCount) * 100 : 0;
+                      return (
+                        <div key={skill.name} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ width: '90px', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={skill.name}>{skill.name}</span>
+                          <div style={{ flexGrow: 1, height: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ width: `${percent}%`, height: '100%', background: 'linear-gradient(90deg, #8b5cf6 0%, #06b6d4 100%)', borderRadius: '4px' }}></div>
+                          </div>
+                          <span style={{ width: '30px', fontSize: '12px', fontWeight: '700', color: '#06b6d4', textAlign: 'right' }}>{skill.count}</span>
                         </div>
                       );
                     })}

@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Users, Plus, Trash2, Upload, Compass, Check, AlertCircle, FileSpreadsheet, X, MessageCircle } from 'lucide-react';
 import { parseAndValidateMembers } from '../utils/importer';
 
-export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }) {
+export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup, students = [] }) {
   const [showAddGroupForm, setShowAddGroupForm] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showMatchmakerGroup, setShowMatchmakerGroup] = useState(null);
 
   // New Group Form State
   const [groupName, setGroupName] = useState('');
@@ -30,6 +31,40 @@ export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }
   const [editDescription, setEditDescription] = useState('');
   const [editMotto, setEditMotto] = useState('');
   const [editWhatsappLink, setEditWhatsappLink] = useState('');
+
+  const getMatchmakerSuggestions = (group) => {
+    if (!students || students.length === 0) return [];
+    
+    const currentRolls = new Set((group.members || []).map(m => (m.roll_number || '').toUpperCase().trim()));
+    
+    const representedSkills = new Set();
+    (group.members || []).forEach(m => {
+      const globalStudent = students.find(s => s.roll_number?.toUpperCase().trim() === (m.roll_number || '').toUpperCase().trim());
+      const skillsStr = globalStudent?.top_skills || globalStudent?.skills || '';
+      skillsStr.split(',').forEach(sk => {
+        const clean = sk.trim().toLowerCase();
+        if (clean) representedSkills.add(clean);
+      });
+    });
+
+    const candidates = students.filter(s => s.roll_number && !currentRolls.has(s.roll_number.toUpperCase().trim()));
+    
+    const scored = candidates.map(s => {
+      const studentSkills = (s.top_skills || s.skills || '').split(',').map(sk => sk.trim()).filter(Boolean);
+      const newSkills = studentSkills.filter(sk => !representedSkills.has(sk.toLowerCase()));
+      
+      return {
+        student: s,
+        score: newSkills.length,
+        newSkills
+      };
+    });
+
+    return scored
+      .filter(candidate => candidate.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+  };
 
   const handleCreateGroup = (e) => {
     e.preventDefault();
@@ -375,10 +410,23 @@ export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }
                     setActiveAddMemberGroup(activeAddMemberGroup === group.id ? null : group.id);
                     setActiveBulkGroup(null);
                     setEditingGroupId(null);
+                    setShowMatchmakerGroup(null);
                   }}
                   style={{ padding: '6px 12px', fontSize: '12px' }}
                 >
                   <Plus size={14} /> Add Member
+                </button>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => {
+                    setShowMatchmakerGroup(showMatchmakerGroup === group.id ? null : group.id);
+                    setActiveAddMemberGroup(null);
+                    setActiveBulkGroup(null);
+                    setEditingGroupId(null);
+                  }}
+                  style={{ padding: '6px 12px', fontSize: '12px', background: 'rgba(139, 92, 246, 0.1)', color: 'var(--color-secondary)', border: '1px solid rgba(139, 92, 246, 0.2)' }}
+                >
+                  <Compass size={14} /> Matchmaker
                 </button>
                 <button 
                   className="btn btn-secondary" 
@@ -452,6 +500,57 @@ export default function GroupsTracker({ groupsList, onSaveGroup, onDeleteGroup }
                   <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '11px' }} onClick={() => setActiveAddMemberGroup(null)}>Cancel</button>
                   <button className="btn btn-primary" style={{ padding: '4px 10px', fontSize: '11px' }} onClick={() => handleAddMember(group)}>Save Member</button>
                 </div>
+              </div>
+            )}
+
+            {/* Inline Matchmaker Form */}
+            {showMatchmakerGroup === group.id && (
+              <div style={{ marginTop: '16px', background: 'rgba(139, 92, 246, 0.02)', border: '1px solid rgba(139, 92, 246, 0.15)', borderRadius: '8px', padding: '16px', animation: 'fadeIn 0.2s ease' }}>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: 'var(--color-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}><Compass size={16} /> Smart Team Matchmaker Suggestions</h4>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 16px 0' }}>Finds available facilitators whose skills complement the ones currently represented in this group.</p>
+                
+                {(() => {
+                  const suggestions = getMatchmakerSuggestions(group);
+                  if (suggestions.length === 0) {
+                    return <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No suggestions available (either roster is empty or all students are already in this group).</div>;
+                  }
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {suggestions.map(({ student, score, newSkills }) => (
+                        <div key={student.roll_number} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', padding: '12px', borderRadius: '8px' }}>
+                          <div>
+                            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{student.name} ({student.roll_number})</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Dept: {student.department}</div>
+                            {newSkills.length > 0 && (
+                              <div style={{ fontSize: '11px', color: '#8b5cf6', marginTop: '4px' }}>
+                                Brings {score} new skill(s): <span style={{ color: 'var(--text-primary)' }}>{newSkills.join(', ')}</span>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 10px', fontSize: '11px' }}
+                            onClick={() => {
+                              const newMember = {
+                                name: student.name,
+                                roll_number: student.roll_number,
+                                position: 'Member',
+                                contact_info: student.email || ''
+                              };
+                              const updatedGroup = {
+                                ...group,
+                                members: [...(group.members || []), newMember]
+                              };
+                              onSaveGroup(updatedGroup);
+                            }}
+                          >
+                            Add to Group
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
