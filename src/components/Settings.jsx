@@ -171,12 +171,44 @@ export default function Settings() {
 
     try {
       const currentConfig = getLLMConfig();
+      let modelToUse = config.detectedModel || currentConfig.detectedModel;
+
+      // --- Auto-detect model first if not yet discovered ---
+      const activeKey = config.provider === 'groq'
+        ? config.groqApiKey
+        : config.provider === 'openrouter'
+          ? config.openrouterApiKey
+          : config.apiKey;
+
+      if (!modelToUse && activeKey) {
+        setModelDetectionStatus('detecting');
+        setDetectedModelLabel('Detecting model for your key...');
+        try {
+          const { model, label } = await autoDetectModel(config.provider, activeKey);
+          modelToUse = model;
+          const updated = { ...config, detectedModel: model };
+          setConfig(updated);
+          saveLLMConfig(updated);
+          setDetectedModelLabel(label);
+          setModelDetectionStatus('done');
+        } catch (detErr) {
+          setDetectedModelLabel(`Detection failed: ${detErr.message}`);
+          setModelDetectionStatus('error');
+          // Use sensible defaults if detection fails
+          modelToUse = config.provider === 'groq'
+            ? 'llama-3.1-8b-instant'
+            : config.provider === 'openrouter'
+              ? 'meta-llama/llama-3-8b-instruct:free'
+              : 'gemini-1.5-flash';
+        }
+      }
+
       let response = '';
       if (config.provider === 'groq') {
         if (!config.groqApiKey) throw new Error('Groq API Key is empty.');
         response = await callGroq(
           config.groqApiKey,
-          config.groqModel || 'llama-3.1-8b-instant',
+          modelToUse || 'llama-3.1-8b-instant',
           'You are a diagnostics assistant.',
           'Respond with "Connection successful, Guru!"'
         );
@@ -184,7 +216,7 @@ export default function Settings() {
         if (!config.openrouterApiKey) throw new Error('OpenRouter API Key is empty.');
         response = await callOpenRouter(
           config.openrouterApiKey,
-          config.openrouterModel || 'meta-llama/llama-3-8b-instruct:free',
+          modelToUse || 'meta-llama/llama-3-8b-instruct:free',
           'You are a diagnostics assistant.',
           'Respond with "Connection successful, Guru!"'
         );
@@ -193,7 +225,7 @@ export default function Settings() {
         response = await callGemini(
           config.apiKey,
           currentConfig.endpoint,
-          config.geminiModel || 'gemini-1.5-flash',
+          modelToUse || 'gemini-1.5-flash',
           currentConfig.systemPrompt,
           'Diagnose system connectivity. Respond with "Connection successful, Guru!" if you can see this message.'
         );
