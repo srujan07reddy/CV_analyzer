@@ -1,4 +1,5 @@
 // SDC Student Analytics - Bulk Upload Importer Utility
+import * as XLSX from 'xlsx';
 
 const VALID_DEPARTMENTS = [
   'Computer Science',
@@ -189,15 +190,7 @@ export function parseAndValidateCSV(csvText) {
   };
 }
 
-export function parseAndValidateJSON(jsonText) {
-  let parsed;
-  try {
-    parsed = JSON.parse(jsonText);
-  } catch (err) {
-    return { success: false, errors: [`Invalid JSON formatting: ${err.message}`], validRecords: [] };
-  }
-
-  const records = Array.isArray(parsed) ? parsed : [parsed];
+export function processJSONRecords(records) {
   const validRecords = [];
   const errors = [];
 
@@ -219,6 +212,8 @@ export function parseAndValidateJSON(jsonText) {
         mappedKey = 'top_skills';
       } else if (clean.includes('project')) {
         mappedKey = 'projects';
+      } else if (clean.includes('dob') || clean.includes('birth') || clean.includes('date')) {
+        mappedKey = 'dob';
       } else {
         mappedKey = key.trim();
       }
@@ -226,7 +221,7 @@ export function parseAndValidateJSON(jsonText) {
       normalizedRecord[mappedKey] = record[key];
     });
 
-    // Also support positional key mapping for JSON if keys are generic
+    // Also support positional key mapping for JSON/Excel if keys are generic
     if (!normalizedRecord.roll_number || !normalizedRecord.name) {
       const keys = Object.keys(record);
       if (keys.length >= 2) {
@@ -248,6 +243,30 @@ export function parseAndValidateJSON(jsonText) {
     errors,
     validRecords
   };
+}
+
+export function parseAndValidateJSON(jsonText) {
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch (err) {
+    return { success: false, errors: [`Invalid JSON formatting: ${err.message}`], validRecords: [] };
+  }
+
+  const records = Array.isArray(parsed) ? parsed : [parsed];
+  return processJSONRecords(records);
+}
+
+export function parseAndValidateXLSX(buffer) {
+  try {
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rawRecords = XLSX.utils.sheet_to_json(sheet, { raw: true, defval: '' });
+    return processJSONRecords(rawRecords);
+  } catch (err) {
+    return { success: false, errors: [`Failed to parse Excel file: ${err.message}`], validRecords: [] };
+  }
 }
 
 function validateStudentField(record, rowIdentifier) {

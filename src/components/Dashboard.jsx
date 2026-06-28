@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Award, BookOpen, Heart, Users, ShieldAlert, UploadCloud, FileSpreadsheet, FileJson, Check, AlertCircle, Sparkles, BrainCircuit, X, RefreshCw, Bot, Send, MessageSquare } from 'lucide-react';
-import { parseAndValidateCSV, parseAndValidateJSON, generateCSVSampleTemplate, getDeptFromRoll, getYearFromRoll } from '../utils/importer';
+import { parseAndValidateCSV, parseAndValidateJSON, parseAndValidateXLSX, generateCSVSampleTemplate, getDeptFromRoll, getYearFromRoll } from '../utils/importer';
 import { getLLMConfig, queryLLM } from '../utils/llm';
 import { isValidDob, isValidRollNumber } from '../utils/studentPortal';
 import { saveMessage } from '../offline-storage/db';
@@ -232,18 +232,23 @@ export default function Dashboard({ students, onSaveStudent, onSaveStudents, onD
 
     if (fileType === 'pdf') {
       setImportStatus('idle');
-      setImportErrors(['You selected a PDF file. The Bulk Import tool only supports CSV, JSON, or plain text student rosters. If you want to analyze a resume PDF, please use the CV Analyzer section instead.']);
+      setImportErrors(['You selected a PDF file. The Bulk Import tool only supports CSV, Excel (XLSX/XLS), JSON, or plain text student rosters. If you want to analyze a resume PDF, please use the CV Analyzer section instead.']);
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const text = e.target.result;
       let result;
-      if (fileType === 'json') {
-        result = parseAndValidateJSON(text);
+      if (fileType === 'xlsx' || fileType === 'xls') {
+        const buffer = e.target.result;
+        result = parseAndValidateXLSX(buffer);
       } else {
-        result = parseAndValidateCSV(text);
+        const text = e.target.result;
+        if (fileType === 'json') {
+          result = parseAndValidateJSON(text);
+        } else {
+          result = parseAndValidateCSV(text);
+        }
       }
 
       if (result.validRecords.length > 0) {
@@ -268,7 +273,11 @@ export default function Dashboard({ students, onSaveStudent, onSaveStudents, onD
       setImportErrors(result.errors || []);
     };
 
-    reader.readAsText(file);
+    if (fileType === 'xlsx' || fileType === 'xls') {
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.readAsText(file);
+    }
   };
 
   const handleDrop = (e) => {
@@ -714,17 +723,17 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
                 <input 
                   type="file" 
                   id="bulk-file-input-empty" 
-                  accept=".csv,.json"
+                  accept=".csv,.json,.txt,.xlsx,.xls"
                   style={{ display: 'none' }}
                   onChange={handleFileChange}
                 />
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                   <UploadCloud size={48} style={{ color: 'var(--color-primary)', filter: 'drop-shadow(0 0 8px rgba(6, 182, 212, 0.3))' }} />
                   <div style={{ fontSize: '16px', fontWeight: '600' }}>
-                    Drag and drop CSV/JSON file here, or <span style={{ color: 'var(--color-primary)' }}>browse</span>
+                    Drag and drop CSV/JSON/Excel file here, or <span style={{ color: 'var(--color-primary)' }}>browse</span>
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    Supports standard SDC headers or JSON array. Max 2MB.
+                    Supports standard SDC headers, Excel spreadsheets, JSON arrays, or plain text records. Max 2MB.
                   </div>
                 </div>
               </div>
@@ -949,7 +958,7 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
             </button>
           )}
           <button className="btn btn-secondary" onClick={() => { setShowImportForm(!showImportForm); setShowAddForm(false); }}>
-            {showImportForm ? 'Close Mass Upload' : 'Mass Upload Data (CSV/JSON/TXT)'}
+            {showImportForm ? 'Close Mass Upload' : 'Mass Upload Data (CSV/JSON/XLSX/TXT)'}
           </button>
           <button className="btn btn-primary" onClick={() => { setShowAddForm(!showAddForm); setShowImportForm(false); }}>
             {showAddForm ? 'Close Registration' : 'Register New Student'}
@@ -965,7 +974,7 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
             Mass Upload Student Data
           </h3>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-            Upload CSV, JSON, or TXT files to register new student facilitators or bulk update existing activity metrics. 
+            Upload CSV, Excel (XLSX/XLS), JSON, or TXT files to register new student facilitators or bulk update existing activity metrics. 
             Roll numbers present in the file will automatically update current records.
           </p>
 
@@ -991,17 +1000,17 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
             <input 
               type="file" 
               id="bulk-file-input" 
-              accept=".csv,.json,.txt"
+              accept=".csv,.json,.txt,.xlsx,.xls"
               style={{ display: 'none' }}
               onChange={handleFileChange}
             />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
               <UploadCloud size={36} style={{ color: 'var(--text-muted)' }} />
               <div style={{ fontSize: '14px', fontWeight: '500' }}>
-                Drag and drop CSV, JSON, or TXT data here, or <span style={{ color: 'var(--color-primary)' }}>browse</span>
+                Drag and drop CSV, Excel, JSON, or TXT data here, or <span style={{ color: 'var(--color-primary)' }}>browse</span>
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Supports standard SDC CSV headers, JSON arrays, or plain text records. Max 2MB.
+                Supports standard SDC CSV headers, Excel spreadsheets, JSON arrays, or plain text records. Max 2MB.
               </div>
             </div>
           </div>
@@ -1250,6 +1259,136 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
               ))
             )}
           </div>
+
+          {/* Overall Student Roster Table */}
+          {students.length > 0 && (
+            <div className="glass-card" style={{ marginTop: '32px', padding: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)' }}>
+                  Overall Student Roster ({students.length} Facilitators)
+                </h3>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Search name or roll..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                      outline: 'none',
+                      minWidth: '200px'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '12px 8px', fontWeight: '600' }}>Roll Number</th>
+                      <th style={{ padding: '12px 8px', fontWeight: '600' }}>Name</th>
+                      <th style={{ padding: '12px 8px', fontWeight: '600' }}>Department</th>
+                      <th style={{ padding: '12px 8px', fontWeight: '600' }}>Skills</th>
+                      <th style={{ padding: '12px 8px', fontWeight: '600' }}>Projects</th>
+                      <th style={{ padding: '12px 8px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const searchFiltered = students.filter(s => {
+                        if (searchQuery.trim()) {
+                          const q = searchQuery.toLowerCase().trim();
+                          return (s.name || '').toLowerCase().includes(q) || (s.roll_number || '').toLowerCase().includes(q);
+                        }
+                        return true;
+                      });
+
+                      if (searchFiltered.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan="6" style={{ padding: '24px 8px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                              No facilitators matched the search query.
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      // Group by batch year
+                      const grouped = {};
+                      searchFiltered.forEach(s => {
+                        const yr = getYearFromRoll(s.roll_number);
+                        if (!grouped[yr]) grouped[yr] = [];
+                        grouped[yr].push(s);
+                      });
+
+                      return Object.keys(grouped).sort().map(year => (
+                        <React.Fragment key={year}>
+                          <tr>
+                            <td colSpan="6" style={{
+                              padding: '10px 8px',
+                              fontWeight: '700',
+                              color: 'var(--color-secondary)',
+                              fontSize: '11px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '1px',
+                              borderBottom: '1px solid rgba(139, 92, 246, 0.15)',
+                              background: 'rgba(139, 92, 246, 0.02)'
+                            }}>
+                              Batch of {year} ({grouped[year].length} Facilitators)
+                            </td>
+                          </tr>
+                          {grouped[year].map(student => (
+                            <tr 
+                              key={student.roll_number} 
+                              style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s ease', cursor: 'pointer' }}
+                              className="table-row-hover"
+                              onClick={() => setSelectedStudentRoll(student.roll_number)}
+                            >
+                              <td style={{ padding: '12px 8px', fontWeight: '600', fontFamily: 'monospace', color: 'var(--color-primary)' }}>
+                                {student.roll_number}
+                              </td>
+                              <td style={{ padding: '12px 8px', fontWeight: '500' }}>{student.name}</td>
+                              <td style={{ padding: '12px 8px', color: 'var(--text-secondary)' }}>{student.department}</td>
+                              <td style={{ padding: '12px 8px' }}>{student.top_skills || student.skills || ''}</td>
+                              <td style={{ padding: '12px 8px' }}>{student.projects || ''}</td>
+                              <td style={{ padding: '12px 8px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                  <button 
+                                    className="btn btn-secondary" 
+                                    style={{ padding: '4px 10px', fontSize: '12px' }}
+                                    onClick={() => setSelectedStudentRoll(student.roll_number)}
+                                  >
+                                    View Profile
+                                  </button>
+                                  <button 
+                                    className="btn" 
+                                    style={{ padding: '4px 10px', fontSize: '12px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-error)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                                    onClick={() => {
+                                      if (window.confirm(`Guru garu, are you sure you want to delete ${student.name}'s record?`)) {
+                                        onDeleteStudent(student.roll_number);
+                                      }
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       ) : !selectedStudentRoll ? (
         /* STAGE 2: ROSTER STUDENT LIST */

@@ -1,7 +1,8 @@
 // SDC Analytics Platform - Local-First Sync Queue
 import { 
   getSyncQueue, 
-  removeFromSyncQueue
+  removeFromSyncQueue,
+  mapStudentToDB
 } from './db';
 import { supabase } from '../supabaseClient';
 
@@ -49,7 +50,7 @@ export async function processSyncQueue() {
         if (item.action === 'SAVE') {
           switch (item.entityType) {
             case 'student':
-              response = await supabase.from('students').upsert(item.data);
+              response = await supabase.from('students').upsert(mapStudentToDB(item.data));
               break;
             case 'outreach':
               response = await supabase.from('outreach').upsert(item.data);

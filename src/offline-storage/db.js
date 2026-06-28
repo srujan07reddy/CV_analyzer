@@ -1,10 +1,105 @@
 import { supabase } from '../supabaseClient';
+import { getYearFromRoll } from '../utils/importer';
 
 // Helper to handle Supabase responses
 const handleResponse = ({ data, error }) => {
   if (error) throw new Error(error.message);
   return data;
 };
+
+// Map Vite frontend student structure to Supabase DB structure
+export function mapStudentToDB(student) {
+  if (!student) return null;
+  const dbStudent = {};
+  
+  // Direct mappings for valid columns only
+  if (student.roll_number) dbStudent.roll_number = student.roll_number;
+  if (student.name) dbStudent.name = student.name;
+  if (student.email) dbStudent.email = student.email;
+  if (student.department) dbStudent.department = student.department;
+  if (student.dob) dbStudent.dob = student.dob;
+  if (student.address) dbStudent.address = student.address;
+  if (student.objective) dbStudent.objective = student.objective;
+  if (student.education) dbStudent.education = student.education;
+  if (student.portfolio) dbStudent.portfolio = student.portfolio;
+  if (student.github_link) dbStudent.github_link = student.github_link;
+  if (student.linkedin_link) dbStudent.linkedin_link = student.linkedin_link;
+
+  // Map top_skills (string) to skills (text[])
+  if ('top_skills' in student) {
+    dbStudent.skills = student.top_skills 
+      ? student.top_skills.split(',').map(s => s.trim()).filter(Boolean) 
+      : [];
+  } else if ('skills' in student) {
+    dbStudent.skills = student.skills;
+  }
+  
+  // Map projects (string) to projects (jsonb array of objects)
+  if ('projects' in student) {
+    if (typeof student.projects === 'string') {
+      dbStudent.projects = student.projects 
+        ? student.projects.split(',').map(p => ({ title: p.trim(), description: '', git_link: '' })).filter(p => p.title)
+        : [];
+    } else {
+      dbStudent.projects = student.projects;
+    }
+  }
+  
+  // Map phone (string) or whatsapp (string) to whatsapp (string)
+  if (student.phone) {
+    dbStudent.whatsapp = student.phone;
+  } else if (student.whatsapp) {
+    dbStudent.whatsapp = student.whatsapp;
+  }
+
+  // Derive batch if missing, based on roll number
+  if (student.batch) {
+    dbStudent.batch = student.batch;
+  } else if (dbStudent.roll_number) {
+    const yr = getYearFromRoll(dbStudent.roll_number);
+    dbStudent.batch = yr && yr !== 'Unknown' ? yr : '2026';
+  }
+
+  // Make sure we update updated_at
+  dbStudent.updated_at = new Date().toISOString();
+
+  return dbStudent;
+}
+
+// Map Supabase DB student structure to Vite frontend structure
+export function mapStudentFromDB(dbStudent) {
+  if (!dbStudent) return null;
+  const student = { ...dbStudent };
+  
+  // Map skills (text[]) to top_skills (string)
+  if ('skills' in student) {
+    student.top_skills = Array.isArray(student.skills) 
+      ? student.skills.join(', ') 
+      : (student.skills || '');
+  } else {
+    student.top_skills = '';
+  }
+  
+  // Map projects (jsonb array of objects) to projects (string)
+  if ('projects' in student) {
+    if (Array.isArray(student.projects)) {
+      student.projects = student.projects.map(p => p.title || p.name || p).join(', ');
+    } else if (typeof student.projects !== 'string') {
+      student.projects = '';
+    }
+  } else {
+    student.projects = '';
+  }
+  
+  // Map whatsapp (string) to phone (string)
+  if ('whatsapp' in student) {
+    student.phone = student.whatsapp;
+  } else {
+    student.phone = '';
+  }
+  
+  return student;
+}
 
 // Local Cache Helpers
 const getLocal = (key) => {
@@ -29,18 +124,20 @@ export async function getAllStudents() {
   if (navigator.onLine) {
     try {
       const res = await supabase.from('students').select('*');
-      const data = handleResponse(res) || [];
+      const rawData = handleResponse(res) || [];
+      const data = rawData.map(mapStudentFromDB);
       setLocal('students', data);
       return data;
     } catch (err) {
       console.warn('[Offline Fallback] Failed to fetch students from Supabase, loading from cache:', err);
     }
   }
-  return getLocal('students') || [];
+  const cached = getLocal('students') || [];
+  return cached.map(mapStudentFromDB);
 }
 
 export async function saveStudent(student) {
-  // Update local cache first
+  // Update local cache first (stored in frontend format)
   const cache = getLocal('students') || [];
   const idx = cache.findIndex(s => s.roll_number === student.roll_number);
   if (idx > -1) {
@@ -52,8 +149,10 @@ export async function saveStudent(student) {
 
   if (navigator.onLine) {
     try {
-      const res = await supabase.from('students').upsert(student).select();
-      return handleResponse(res);
+      const dbStudent = mapStudentToDB(student);
+      const res = await supabase.from('students').upsert(dbStudent).select();
+      const rawSaved = handleResponse(res);
+      return rawSaved ? rawSaved.map(mapStudentFromDB) : [student];
     } catch (err) {
       console.warn('[Offline Queue] Failed to upsert student to Supabase, queuing mutation:', err);
       await addToSyncQueue('SAVE', 'student', student);
@@ -93,15 +192,16 @@ export async function getStudent(roll_number) {
         if (res.error.code === 'PGRST116') return null; // PostgREST code for "not found"
         throw new Error(res.error.message);
       }
+      const mapped = mapStudentFromDB(res.data);
       const cache = getLocal('students') || [];
       const idx = cache.findIndex(s => s.roll_number === roll_number);
       if (idx > -1) {
-        cache[idx] = res.data;
+        cache[idx] = mapped;
       } else {
-        cache.push(res.data);
+        cache.push(mapped);
       }
       setLocal('students', cache);
-      return res.data;
+      return mapped;
     } catch (err) {
       console.warn('[Offline Fallback] Failed to fetch student from Supabase, loading from cache:', err);
     }

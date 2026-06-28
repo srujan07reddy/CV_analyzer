@@ -40,8 +40,48 @@ class StudentAnalyticsEngine:
 
         student_data = student_row.iloc[0]
 
-        skills_list = [s.strip() for s in str(student_data.get('top_skills', '')).split(',') if s.strip()]
-        projects_str = str(student_data.get('projects', ''))
+        # Parse skills (supports list array or comma-separated string)
+        skills_val = student_data.get('skills', '')
+        if isinstance(skills_val, list):
+            skills_list = [str(s).strip() for s in skills_val if str(s).strip()]
+        elif isinstance(skills_val, str) and skills_val.startswith('[') and skills_val.endswith(']'):
+            # In case it was serialized as a string representation of a list
+            try:
+                parsed_list = json.loads(skills_val)
+                skills_list = [str(s).strip() for s in parsed_list if str(s).strip()]
+            except:
+                skills_list = [s.strip() for s in skills_val.split(',') if s.strip()]
+        else:
+            skills_str = str(student_data.get('top_skills', '') or skills_val or '')
+            skills_list = [s.strip() for s in skills_str.split(',') if s.strip()]
+
+        # Parse projects (supports JSONB array of objects, list, or string)
+        projects_val = student_data.get('projects', '')
+        if isinstance(projects_val, list):
+            proj_titles = []
+            for p in projects_val:
+                if isinstance(p, dict):
+                    proj_titles.append(p.get('title') or p.get('name') or str(p))
+                else:
+                    proj_titles.append(str(p))
+            projects_str = ', '.join(proj_titles)
+        elif isinstance(projects_val, str) and projects_val.startswith('['):
+            try:
+                parsed_proj = json.loads(projects_val)
+                if isinstance(parsed_proj, list):
+                    proj_titles = []
+                    for p in parsed_proj:
+                        if isinstance(p, dict):
+                          proj_titles.append(p.get('title') or p.get('name') or str(p))
+                        else:
+                          proj_titles.append(str(p))
+                    projects_str = ', '.join(proj_titles)
+                else:
+                    projects_str = str(parsed_proj)
+            except:
+                projects_str = projects_val
+        else:
+            projects_str = str(projects_val)
 
         return {
             'student_id': student_id,
