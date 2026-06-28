@@ -30,6 +30,29 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
       setLoading(true);
       
       try {
+        // 1. Try database lookup in management_members first
+        const { data: memberData, error: dbError } = await supabase
+          .from('management_members')
+          .select('*')
+          .eq('email', adminUser.trim())
+          .single();
+
+        if (!dbError && memberData) {
+          if (adminPass === memberData.contact_info) {
+            console.log('[Management Auth] Authenticated via management_members table.');
+            localStorage.setItem('sdc_admin_local_session', 'true');
+            localStorage.setItem('sdc_logged_in_email', memberData.email);
+            onManagementLogin();
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (dbErr) {
+        console.warn('[Management Auth] Database lookup failed:', dbErr);
+      }
+
+      // 2. Fall back to Supabase Auth or local fallback credentials
+      try {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: adminUser.trim(),
           password: adminPass
