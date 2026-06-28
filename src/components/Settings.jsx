@@ -114,6 +114,14 @@ export default function Settings() {
       const { error } = await supabase.auth.updateUser(updates);
       if (error) throw error;
       
+      if (newEmail) {
+        localStorage.setItem('sdc_admin_fallback_email', newEmail.trim());
+        localStorage.setItem('sdc_logged_in_email', newEmail.trim());
+      }
+      if (newPassword) {
+        localStorage.setItem('sdc_admin_fallback_password', newPassword);
+      }
+
       setAuthUpdateStatus('success');
       setAuthUpdateMessage('Credentials updated successfully!');
       setNewEmail('');

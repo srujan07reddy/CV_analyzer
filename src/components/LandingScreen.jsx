@@ -46,10 +46,12 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
         }
       } catch (err) {
         // Fallback to local admin credentials if Supabase auth fails (e.g. rate limit, offline, pepper mismatch)
-        if (adminUser.trim() === 'admin@jeppiaar.edu.in' && adminPass === 'AdminPassword123') {
+        const fallbackEmail = localStorage.getItem('sdc_admin_fallback_email') || 'admin@jeppiaar.edu.in';
+        const fallbackPassword = localStorage.getItem('sdc_admin_fallback_password') || 'AdminPassword123';
+        if (adminUser.trim() === fallbackEmail && adminPass === fallbackPassword) {
           console.log('[Auth Fallback] Authenticated via local credentials.');
           localStorage.setItem('sdc_admin_local_session', 'true');
-          localStorage.setItem('sdc_logged_in_email', 'admin@jeppiaar.edu.in');
+          localStorage.setItem('sdc_logged_in_email', fallbackEmail);
           onManagementLogin();
         } else {
           const msg = typeof err === 'string' ? err : (err && err.message) ? err.message : 'Login failed. Please try again.';
