@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getLLMConfig, saveLLMConfig, queryLLM, callGemini, callGroq, callOpenRouter, autoDetectModel } from '../utils/llm';
 import { ShieldCheck, ShieldAlert, Cpu, Play, RefreshCw, Key, HelpCircle, UserCheck, Users, Trash2, Edit2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import bcrypt from 'bcryptjs';
 
 export default function Settings() {
   const [config, setConfig] = useState({
@@ -24,7 +25,7 @@ export default function Settings() {
   // Management Members State
   const [members, setMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
-  const [memberForm, setMemberForm] = useState({ id: '', name: '', email: '', role: 'Coordinator', contact_info: '' });
+  const [memberForm, setMemberForm] = useState({ id: '', name: '', email: '', role: 'Coordinator', contact_info: '', password: '' });
   const [isEditingMember, setIsEditingMember] = useState(false);
 
   const fetchMembers = async () => {
@@ -50,29 +51,59 @@ export default function Settings() {
       return;
     }
     try {
+      const emailVal = memberForm.email.trim();
+      
       if (memberForm.id) {
         const { error } = await supabase
           .from('management_members')
           .update({
             name: memberForm.name.trim(),
-            email: memberForm.email.trim(),
+            email: emailVal,
             role: memberForm.role,
             contact_info: memberForm.contact_info.trim()
           })
           .eq('id', memberForm.id);
         if (error) throw error;
+
+        if (memberForm.password && memberForm.password.trim()) {
+          const salt = bcrypt.genSaltSync(10);
+          const passwordHash = bcrypt.hashSync(memberForm.password.trim(), salt);
+          const { error: passErr } = await supabase
+            .from('management_passwords')
+            .upsert({
+              email: emailVal,
+              password: passwordHash
+            });
+          if (passErr) throw passErr;
+        }
       } else {
         const { error } = await supabase
           .from('management_members')
           .insert({
             name: memberForm.name.trim(),
-            email: memberForm.email.trim(),
+            email: emailVal,
             role: memberForm.role,
             contact_info: memberForm.contact_info.trim()
           });
         if (error) throw error;
+
+        const rawPassword = memberForm.password && memberForm.password.trim() 
+          ? memberForm.password.trim() 
+          : memberForm.contact_info.trim();
+
+        if (rawPassword) {
+          const salt = bcrypt.genSaltSync(10);
+          const passwordHash = bcrypt.hashSync(rawPassword, salt);
+          const { error: passErr } = await supabase
+            .from('management_passwords')
+            .insert({
+              email: emailVal,
+              password: passwordHash
+            });
+          if (passErr) throw passErr;
+        }
       }
-      setMemberForm({ id: '', name: '', email: '', role: 'Coordinator', contact_info: '' });
+      setMemberForm({ id: '', name: '', email: '', role: 'Coordinator', contact_info: '', password: '' });
       setIsEditingMember(false);
       fetchMembers();
     } catch (err) {
@@ -610,13 +641,27 @@ export default function Settings() {
               onChange={e => setMemberForm({ ...memberForm, contact_info: e.target.value })} 
             />
           </div>
+          <div className="form-group">
+            <label htmlFor="member-password" className="form-label">
+              {isEditingMember ? 'Password (Leave blank to keep current)' : 'Password (Default: Contact Number)'}
+            </label>
+            <input 
+              id="member-password"
+              name="member-password"
+              type="password" 
+              className="form-control" 
+              placeholder="••••••••" 
+              value={memberForm.password || ''} 
+              onChange={e => setMemberForm({ ...memberForm, password: e.target.value })} 
+            />
+          </div>
           <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '12px', alignItems: 'center' }}>
             {isEditingMember && (
               <button 
                 type="button" 
                 className="btn btn-secondary" 
                 onClick={() => {
-                  setMemberForm({ id: '', name: '', email: '', role: 'Coordinator', contact_info: '' });
+                  setMemberForm({ id: '', name: '', email: '', role: 'Coordinator', contact_info: '', password: '' });
                   setIsEditingMember(false);
                 }}
               >
@@ -662,7 +707,7 @@ export default function Settings() {
                   <td style={{ padding: '10px 8px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                     <button 
                       onClick={() => {
-                        setMemberForm({ id: member.id, name: member.name, email: member.email, role: member.role, contact_info: member.contact_info || '' });
+                        setMemberForm({ id: member.id, name: member.name, email: member.email, role: member.role, contact_info: member.contact_info || '', password: '' });
                         setIsEditingMember(true);
                       }}
                       style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', padding: '4px', display: 'inline-flex', alignItems: 'center' }}

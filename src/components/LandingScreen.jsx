@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BookOpen, Shield, GraduationCap, AlertCircle, Key, User, Eye, EyeOff } from 'lucide-react';
 import { getStudent } from '../offline-storage/db';
 import { supabase } from '../supabaseClient';
+import bcrypt from 'bcryptjs';
 
 export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
   const [role, setRole] = useState('student'); // 'student' | 'management'
@@ -30,21 +31,47 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
       setLoading(true);
       
       try {
-        // 1. Try database lookup in management_members first
-        const { data: memberData, error: dbError } = await supabase
-          .from('management_members')
-          .select('*')
-          .eq('email', adminUser.trim())
-          .single();
+        // 1. Try database lookup in management_passwords table first
+        const { data: passData, error: dbError } = await supabase
+          .from('management_passwords')
+          .select('password')
+          .ilike('email', adminUser.trim())
+          .maybeSingle();
 
-        if (!dbError && memberData) {
-          if (adminPass === memberData.contact_info) {
-            console.log('[Management Auth] Authenticated via management_members table.');
+        if (!dbError && passData) {
+          if (bcrypt.compareSync(adminPass, passData.password)) {
+            console.log('[Management Auth] Authenticated via management_passwords table.');
             localStorage.setItem('sdc_admin_local_session', 'true');
-            localStorage.setItem('sdc_logged_in_email', memberData.email);
+            localStorage.setItem('sdc_logged_in_email', adminUser.trim().toLowerCase());
             onManagementLogin();
             setLoading(false);
             return;
+          } else {
+            setError('Incorrect password for this management account.');
+            setLoading(false);
+            return;
+          }
+        } else {
+          // 2. Backwards compatibility: Try lookup in management_members table
+          const { data: memberData, error: memberError } = await supabase
+            .from('management_members')
+            .select('*')
+            .ilike('email', adminUser.trim())
+            .maybeSingle();
+
+          if (!memberError && memberData) {
+            if (adminPass.trim() === memberData.contact_info.trim()) {
+              console.log('[Management Auth] Authenticated via management_members contact info.');
+              localStorage.setItem('sdc_admin_local_session', 'true');
+              localStorage.setItem('sdc_logged_in_email', memberData.email);
+              onManagementLogin();
+              setLoading(false);
+              return;
+            } else {
+              setError('Incorrect password for this management account.');
+              setLoading(false);
+              return;
+            }
           }
         }
       } catch (dbErr) {
