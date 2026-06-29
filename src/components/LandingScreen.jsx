@@ -41,6 +41,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
         if (!dbError && passData) {
           if (bcrypt.compareSync(adminPass, passData.password)) {
             console.log('[Management Auth] Authenticated via management_passwords table.');
+            await supabase.auth.signOut().catch(() => {});
             localStorage.setItem('sdc_admin_local_session', 'true');
             localStorage.setItem('sdc_logged_in_email', adminUser.trim().toLowerCase());
             onManagementLogin();
@@ -62,6 +63,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
           if (!memberError && memberData) {
             if (adminPass.trim() === memberData.contact_info.trim()) {
               console.log('[Management Auth] Authenticated via management_members contact info.');
+              await supabase.auth.signOut().catch(() => {});
               localStorage.setItem('sdc_admin_local_session', 'true');
               localStorage.setItem('sdc_logged_in_email', memberData.email);
               onManagementLogin();
@@ -82,6 +84,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: adminUser.trim(),
+          prompt: 'none',
           password: adminPass
         });
         
@@ -100,6 +103,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
         const fallbackPassword = localStorage.getItem('sdc_admin_fallback_password') || 'AdminPassword123';
         if (adminUser.trim() === fallbackEmail && adminPass === fallbackPassword) {
           console.log('[Auth Fallback] Authenticated via local credentials.');
+          await supabase.auth.signOut().catch(() => {});
           localStorage.setItem('sdc_admin_local_session', 'true');
           localStorage.setItem('sdc_logged_in_email', fallbackEmail);
           onManagementLogin();

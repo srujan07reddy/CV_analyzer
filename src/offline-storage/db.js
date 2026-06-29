@@ -162,9 +162,8 @@ export async function saveStudent(student) {
       const rawSaved = handleResponse(res);
       return rawSaved ? rawSaved.map(mapStudentFromDB) : [student];
     } catch (err) {
-      console.warn('[Offline Queue] Failed to upsert student to Supabase, queuing mutation:', err);
-      await addToSyncQueue('SAVE', 'student', student);
-      return [student];
+      console.error('[Supabase Upsert Error] Failed to upsert student to Supabase:', err);
+      throw err;
     }
   } else {
     await addToSyncQueue('SAVE', 'student', student);
@@ -194,11 +193,8 @@ export async function saveStudentsBulk(studentsList) {
       const rawSaved = handleResponse(res);
       return rawSaved ? rawSaved.map(mapStudentFromDB) : studentsList;
     } catch (err) {
-      console.warn('[Offline Queue] Failed to upsert students in bulk to Supabase, queuing mutations:', err);
-      for (const student of studentsList) {
-        await addToSyncQueue('SAVE', 'student', student);
-      }
-      return studentsList;
+      console.error('[Supabase Bulk Upsert Error] Failed to upsert students in bulk to Supabase:', err);
+      throw err;
     }
   } else {
     for (const student of studentsList) {
