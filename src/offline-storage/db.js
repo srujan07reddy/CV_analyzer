@@ -28,10 +28,10 @@ export function mapStudentToDB(student) {
   // Map top_skills (string) to skills (text[])
   if ('top_skills' in student) {
     dbStudent.skills = student.top_skills 
-      ? student.top_skills.split(',').map(s => s.trim()).filter(Boolean) 
+      ? String(student.top_skills).split(',').map(s => s.trim()).filter(Boolean) 
       : [];
   } else if ('skills' in student) {
-    dbStudent.skills = student.skills;
+    dbStudent.skills = Array.isArray(student.skills) ? student.skills : [String(student.skills)];
   }
   
   // Map projects (string) to projects (jsonb array of objects)
@@ -40,8 +40,12 @@ export function mapStudentToDB(student) {
       dbStudent.projects = student.projects 
         ? student.projects.split(',').map(p => ({ title: p.trim(), description: '', git_link: '' })).filter(p => p.title)
         : [];
-    } else {
+    } else if (Array.isArray(student.projects)) {
       dbStudent.projects = student.projects;
+    } else if (student.projects) {
+      dbStudent.projects = [student.projects];
+    } else {
+      dbStudent.projects = [];
     }
   }
   
@@ -83,7 +87,11 @@ export function mapStudentFromDB(dbStudent) {
   // Map projects (jsonb array of objects) to projects (string)
   if ('projects' in student) {
     if (Array.isArray(student.projects)) {
-      student.projects = student.projects.map(p => p.title || p.name || p).join(', ');
+      student.projects = student.projects
+        .filter(Boolean)
+        .map(p => (typeof p === 'object' ? (p.title || p.name || '') : String(p)))
+        .filter(Boolean)
+        .join(', ');
     } else if (typeof student.projects !== 'string') {
       student.projects = '';
     }
