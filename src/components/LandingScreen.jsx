@@ -6,30 +6,30 @@ import bcrypt from 'bcryptjs';
 
 export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
   const [role, setRole] = useState('student'); // 'student' | 'management'
-  
+
   // Student Auth State
   const [rollNumber, setRollNumber] = useState('');
   const [dob, setDob] = useState('');
-  
+
   // Management Auth State
   const [adminUser, setAdminUser] = useState(''); // Will now be email
   const [adminPass, setAdminPass] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     if (role === 'management') {
       if (!adminUser.trim() || !adminPass.trim()) {
         return setError('Please enter both email and password.');
       }
-      
+
       setLoading(true);
-      
+
       try {
         // 1. Try database lookup in management_passwords table first
         const { data: passData, error: dbError } = await supabase
@@ -41,7 +41,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
         if (!dbError && passData) {
           if (bcrypt.compareSync(adminPass, passData.password)) {
             console.log('[Management Auth] Authenticated via management_passwords table.');
-            await supabase.auth.signOut().catch(() => {});
+            await supabase.auth.signOut().catch(() => { });
             localStorage.setItem('sdc_admin_local_session', 'true');
             localStorage.setItem('sdc_logged_in_email', adminUser.trim().toLowerCase());
             onManagementLogin();
@@ -63,7 +63,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
           if (!memberError && memberData) {
             if (adminPass.trim() === memberData.contact_info.trim()) {
               console.log('[Management Auth] Authenticated via management_members contact info.');
-              await supabase.auth.signOut().catch(() => {});
+              await supabase.auth.signOut().catch(() => { });
               localStorage.setItem('sdc_admin_local_session', 'true');
               localStorage.setItem('sdc_logged_in_email', memberData.email);
               onManagementLogin();
@@ -87,9 +87,9 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
           prompt: 'none',
           password: adminPass
         });
-        
+
         if (error) throw error;
-        
+
         if (data?.session) {
           localStorage.setItem('sdc_admin_local_session', 'true');
           localStorage.setItem('sdc_logged_in_email', data.session.user.email);
@@ -103,7 +103,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
         const fallbackPassword = localStorage.getItem('sdc_admin_fallback_password') || 'AdminPassword123';
         if (adminUser.trim() === fallbackEmail && adminPass === fallbackPassword) {
           console.log('[Auth Fallback] Authenticated via local credentials.');
-          await supabase.auth.signOut().catch(() => {});
+          await supabase.auth.signOut().catch(() => { });
           localStorage.setItem('sdc_admin_local_session', 'true');
           localStorage.setItem('sdc_logged_in_email', fallbackEmail);
           onManagementLogin();
@@ -116,7 +116,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
       }
       return;
     }
-    
+
     // Student Login Logic
     if (!rollNumber.trim()) return setError('Please enter your Roll Number.');
     if (!dob.trim()) return setError('Please enter your Date of Birth.');
@@ -180,13 +180,13 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
 
       {/* Unified Login Card */}
       <div style={{ width: '100%', maxWidth: '420px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '24px', padding: '36px', zIndex: 10, backdropFilter: 'blur(10px)' }}>
-        
+
         {/* Role Toggle */}
         <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '6px', marginBottom: '32px' }}>
-          <button 
+          <button
             type="button"
-            onClick={() => { setRole('student'); setError(''); }} 
-            style={{ 
+            onClick={() => { setRole('student'); setError(''); }}
+            style={{
               flex: 1, padding: '10px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: '600', transition: 'all 0.2s ease',
               background: role === 'student' ? 'rgba(6,182,212,0.15)' : 'transparent',
               color: role === 'student' ? '#67e8f9' : '#64748b',
@@ -194,10 +194,10 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
           >
             <GraduationCap size={16} /> Student
           </button>
-          <button 
+          <button
             type="button"
-            onClick={() => { setRole('management'); setError(''); }} 
-            style={{ 
+            onClick={() => { setRole('management'); setError(''); }}
+            style={{
               flex: 1, padding: '10px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '14px', fontWeight: '600', transition: 'all 0.2s ease',
               background: role === 'management' ? 'rgba(139,92,246,0.15)' : 'transparent',
               color: role === 'management' ? '#c4b5fd' : '#64748b',
@@ -209,7 +209,7 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
 
         {/* Login Form */}
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
+
           {role === 'student' ? (
             <>
               <div>
@@ -318,8 +318,8 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
           )}
 
           <button type="submit" disabled={loading} style={{
-            width: '100%', padding: '14px', 
-            background: loading ? 'rgba(255,255,255,0.1)' : (role === 'student' ? 'linear-gradient(135deg, #06b6d4, #0891b2)' : 'linear-gradient(135deg, #8b5cf6, #7c3aed)'), 
+            width: '100%', padding: '14px',
+            background: loading ? 'rgba(255,255,255,0.1)' : (role === 'student' ? 'linear-gradient(135deg, #06b6d4, #0891b2)' : 'linear-gradient(135deg, #8b5cf6, #7c3aed)'),
             border: 'none', borderRadius: '12px', color: '#fff', fontSize: '15px', fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: '0.3px', marginTop: '8px',
             transition: 'background 0.3s ease'
           }}>

@@ -593,28 +593,32 @@ Respond strictly as Shishya, in a dedicated, respectful tone, and formatting eve
       projects: projects.trim()
     };
 
-    await onSaveStudent(newStudent);
+    try {
+      await onSaveStudent(newStudent);
 
-    if (messageTitle.trim() || messageBody.trim()) {
-      await saveMessage({
-        roll_number: upperRoll,
-        title: messageTitle.trim() || 'Message from management',
-        body: messageBody.trim() || 'A new message has been shared for you.',
-        timestamp: Date.now(),
-        read: false
-      });
+      if (messageTitle.trim() || messageBody.trim()) {
+        await saveMessage({
+          roll_number: upperRoll,
+          title: messageTitle.trim() || 'Message from management',
+          body: messageBody.trim() || 'A new message has been shared for you.',
+          timestamp: Date.now(),
+          read: false
+        });
+      }
+      
+      // Reset Form
+      setRollNumber('');
+      setName('');
+      setEmail('');
+      setDob('');
+      setTopSkills('');
+      setProjects('');
+      setMessageTitle('');
+      setMessageBody('');
+      setShowAddForm(false);
+    } catch (err) {
+      setErrorMsg(`Failed to register student: ${err.message}`);
     }
-    
-    // Reset Form
-    setRollNumber('');
-    setName('');
-    setEmail('');
-    setDob('');
-    setTopSkills('');
-    setProjects('');
-    setMessageTitle('');
-    setMessageBody('');
-    setShowAddForm(false);
   };
 
   const handleSaveTemplate = async () => {

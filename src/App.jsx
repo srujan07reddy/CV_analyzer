@@ -221,6 +221,7 @@ export default function App() {
       await loadData();
     } catch (err) {
       console.error('Failed to save student:', err);
+      throw err;
     }
   };
 
