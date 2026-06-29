@@ -172,6 +172,42 @@ export async function saveStudent(student) {
   }
 }
 
+export async function saveStudentsBulk(studentsList) {
+  if (!studentsList || studentsList.length === 0) return [];
+
+  // Update local cache first
+  const cache = getLocal('students') || [];
+  studentsList.forEach(student => {
+    const idx = cache.findIndex(s => s.roll_number === student.roll_number);
+    if (idx > -1) {
+      cache[idx] = { ...cache[idx], ...student };
+    } else {
+      cache.push(student);
+    }
+  });
+  setLocal('students', cache);
+
+  if (navigator.onLine) {
+    try {
+      const dbStudents = studentsList.map(mapStudentToDB);
+      const res = await supabase.from('students').upsert(dbStudents).select();
+      const rawSaved = handleResponse(res);
+      return rawSaved ? rawSaved.map(mapStudentFromDB) : studentsList;
+    } catch (err) {
+      console.warn('[Offline Queue] Failed to upsert students in bulk to Supabase, queuing mutations:', err);
+      for (const student of studentsList) {
+        await addToSyncQueue('SAVE', 'student', student);
+      }
+      return studentsList;
+    }
+  } else {
+    for (const student of studentsList) {
+      await addToSyncQueue('SAVE', 'student', student);
+    }
+    return studentsList;
+  }
+}
+
 export async function deleteStudent(roll_number) {
   const cache = getLocal('students') || [];
   const filtered = cache.filter(s => s.roll_number !== roll_number);

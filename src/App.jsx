@@ -3,6 +3,7 @@ import {
   initDB, 
   getAllStudents, 
   saveStudent, 
+  saveStudentsBulk,
   deleteStudent, 
   getStudent,
   clearAllStudents,
@@ -227,16 +228,17 @@ export default function App() {
   const handleSaveStudents = async (studentsList) => {
     try {
       console.log(`[App] Saving ${studentsList.length} student records in bulk.`);
-      const mergedStudents = [];
-      for (const student of studentsList) {
-        const existing = await getStudent(student.roll_number);
-        const merged = mergeStudentRecords(existing, student);
-        await saveStudent(merged);
-        mergedStudents.push(merged);
-        if (!navigator.onLine) {
-          await addToSyncQueue('SAVE', 'student', merged);
-        }
-      }
+      const allStudents = await getAllStudents();
+      const studentMap = new Map(allStudents.map(s => [s.roll_number.toUpperCase(), s]));
+      
+      const mergedStudents = studentsList.map(student => {
+        const rollUpper = student.roll_number.toUpperCase();
+        const existing = studentMap.get(rollUpper) || null;
+        return mergeStudentRecords(existing, student);
+      });
+
+      await saveStudentsBulk(mergedStudents);
+
       if (navigator.onLine) {
         console.log('[Online] Bulk student records replicated to server registry.');
       } else {
