@@ -569,8 +569,9 @@ export default function CVAnalyzer({ students = [], onSaveStudent }) {
         <div>
           <h2 style={{ fontSize: '22px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <BrainCircuit style={{ color: 'var(--color-primary)' }} />
-            Jeppiaar Shikshak CV Analyzer
+            Jeppiaar Student CV Analyzer
           </h2>
+
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '4px 0 0 0' }}>
             Guru garu, analyze candidate CV profiles to extract SDC facilitation manifests and generate executive reports.
           </p>

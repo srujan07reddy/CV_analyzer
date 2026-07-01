@@ -189,13 +189,14 @@ except ImportError:
 
 if HAS_STREAMLIT:
     # streamlit layout
-    st.set_page_config(page_title="Jeppiaar Shikshak - Student Analytics Dashboard", layout="wide")
+    st.set_page_config(page_title="Jeppiaar Student - Student Analytics Dashboard", layout="wide")
 
     st.markdown("""
         <div style="background: rgba(6, 182, 212, 0.08); padding: 16px; border-radius: 12px; border: 1px solid rgba(6, 182, 212, 0.2); margin-bottom: 24px;">
-            <h1 style="color: #06b6d4; margin: 0; font-size: 28px;">📘 Jeppiaar Shikshak — Student Analytics</h1>
+            <h1 style="color: #06b6d4; margin: 0; font-size: 28px;">📘 Jeppiaar Student — Student Analytics</h1>
             <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 14px;">Local caching dashboard with Gemini-Flash narrative automation for portfolio assessment.</p>
         </div>
+
     """, unsafe_allow_html=True)
 
     # Initialize Engine

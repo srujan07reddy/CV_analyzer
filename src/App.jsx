@@ -473,8 +473,9 @@ export default function App() {
       {/* Header bar */}
       <header className="app-header">
         <div className="brand">
-          <span className="brand-logo">Jeppiaar Shikshak CV Analyzer</span>
+          <span className="brand-logo">Jeppiaar Student CV Analyzer</span>
         </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             onClick={handleLogout}

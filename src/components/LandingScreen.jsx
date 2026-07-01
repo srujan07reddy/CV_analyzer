@@ -172,8 +172,9 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
             <BookOpen size={26} color="#fff" />
           </div>
           <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '800', background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            Jeppiaar Shikshak
+            Jeppiaar Student
           </h1>
+
         </div>
         <p style={{ color: '#64748b', fontSize: '15px', margin: 0 }}>Student Development & Analytics Platform</p>
       </div>
@@ -329,8 +330,9 @@ export default function LandingScreen({ onManagementLogin, onStudentLogin }) {
       </div>
 
       <p style={{ marginTop: '40px', color: '#1e293b', fontSize: '12px', zIndex: 10 }}>
-        Jeppiaar Shikshak © {new Date().getFullYear()}
+        Jeppiaar Student © {new Date().getFullYear()}
       </p>
+
     </div>
   );
 }
